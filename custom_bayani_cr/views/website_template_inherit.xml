@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <template id="filter_products_price_inherit" inherit_id="website_sale.filter_products_price">
+        <xpath expr="//div[@id='o_wsale_price_range_option']" position="attributes">
+            <attribute name="t-if">
+                user_id.id != request.env.ref('base.public_user').id
+            </attribute>
+        </xpath>
+    </template>
+    <template id="price_inherit_template" inherit_id="website_sale.product_price">
+        <xpath expr="//div[contains(@t-attf-class, 'product_price')]" position="attributes">
+            <attribute name="t-if">
+                user_id.id != request.env.ref('base.public_user').id
+            </attribute>
+        </xpath>
+    </template>
+    <template id="quantity_custom" inherit_id="website_sale.product_quantity">
+        <xpath expr="//div[contains(@t-attf-class, 'css_quantity input-group')]" position="attributes">
+            <attribute name="t-if">
+                user_id.id != request.env.ref('base.public_user').id
+            </attribute>
+        </xpath>
+    </template>
+    <template id="product_custom" inherit_id="website_sale.product">
+        <xpath expr="//a[@id='add_to_cart']" position="attributes">
+            <attribute name="t-if">
+                user_id.id != request.env.ref('base.public_user').id
+            </attribute>
+        </xpath>
+    </template>
+    <template id="custom_product_price" inherit_id="website_sale.products_item">
+        <xpath expr="//div[hasclass('product_price')]" position="attributes">
+            <attribute name="t-if">
+                user_id.id != request.env.ref('base.public_user').id
+            </attribute>
+        </xpath>
+    </template>
+</odoo>
