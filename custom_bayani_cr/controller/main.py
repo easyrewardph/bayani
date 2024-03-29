@@ -1,5 +1,6 @@
 from odoo import http
 from odoo.addons.website.controllers.main import Website
+from odoo.addons.website_sale.controllers import main as website_sale_controller_custom
 from odoo.http import request
 
 
@@ -15,3 +16,9 @@ class CustomWebsite(Website):
             if user_id == public_user_id:
                 record['detail'] = ''
         return res
+
+
+class WebsiteSale(website_sale_controller_custom.WebsiteSale):
+    def _prepare_product_values(self, product, category='', search='', **kwargs):
+        product = request.env['product.template'].sudo().browse(int(product.id))
+        return super()._prepare_product_values(product, category, search, **kwargs)

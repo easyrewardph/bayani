@@ -27,12 +27,69 @@
                 user_id.id != request.env.ref('base.public_user').id
             </attribute>
         </xpath>
+
+        <!-- Added Expiry-date, Weight and volume in product page-->
+        <xpath expr="//div[@id='o_product_terms_and_share']" position="before">
+            <div class="mb-1">
+                <tr>
+                    <br/>
+                    <span>
+                        <strong>Expiry Date :</strong>
+                    </span>
+                    <td t-if="product.get_nearest_expiry_lot()">
+                        <strong>
+                            <span t-esc="product.get_nearest_expiry_lot().strftime('%m-%d-%Y')"/>
+                        </strong>
+                    </td>
+                </tr>
+                <br/>
+                <tr>
+                    <span>Weight :</span>
+                    <td>
+                        <span t-field="product.weight"/>
+                        <span t-esc="product.weight_uom_name"/>
+                    </td>
+                </tr>
+                <br/>
+                <tr>
+                    <span>Volume :</span>
+                    <td>
+                        <span t-field="product.volume"/>
+                        <span t-esc="product.volume_uom_name"/>
+                    </td>
+                </tr>
+
+            </div>
+        </xpath>
     </template>
     <template id="custom_product_price" inherit_id="website_sale.products_item">
         <xpath expr="//div[hasclass('product_price')]" position="attributes">
             <attribute name="t-if">
                 user_id.id != request.env.ref('base.public_user').id
             </attribute>
+        </xpath>
+    </template>
+
+    <!--    Remove Price From Wishlist while access website through (Public User)-->
+    <template id="custom_product_wishlist" inherit_id="website_sale_wishlist.product_wishlist">
+        <xpath expr="//t[@t-foreach='wishes']//tr//td[3]" position="replace">
+            <td class="align-middle"
+                t-if="combination_info['prevent_zero_price_sale'] and user_id.id != request.env.ref('base.public_user').id">
+                <span t-field="website.prevent_zero_price_sale_text"/>
+            </td>
+        </xpath>
+        <xpath expr="//td[@t-else='']" position="replace">
+            <td class="align-middle o_wish_price" t-elif="user_id.id != request.env.ref('base.public_user').id">
+                <t t-out="combination_info['price']"
+                   t-options="{'widget': 'monetary', 'display_currency': website.currency_id}"/>
+                <small t-if="combination_info['base_unit_price']"
+                       class="cart_product_base_unit_price d-block text-muted"
+                       groups="website_sale.group_show_uom_price">
+                    <t t-call='website_sale.base_unit_price'>
+                        <t t-set='product' t-value='wish.product_id'/>
+                    </t>
+                </small>
+            </td>
         </xpath>
     </template>
 </odoo>
