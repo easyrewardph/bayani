@@ -10,7 +10,9 @@
     'sequence': 8,
     'depends': ['website_sale','website_sale_wishlist','product_expiry','stock'],
     'data': [
-        'views/website_template_inherit.xml'
+        'views/website_template_inherit.xml',
+        'views/res_config_view.xml',
+        'views/web_client_template.xml',
     ],
     'license': 'LGPL-3',
     'installable': True,
