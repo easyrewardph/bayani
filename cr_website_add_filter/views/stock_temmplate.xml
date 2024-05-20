@@ -36,4 +36,58 @@
             </div>
         </xpath>
     </template>
+
+
+    <!--    Added accordion-item for mobile view shorting by 'stock'.-->
+    <template id="cr_website_add_filter_o_wsale_offcanvas" inherit_id="website_sale.o_wsale_offcanvas" active="True"
+              name="OffcanvasCustom">
+        <xpath expr="//div[@id='o_wsale_offcanvas_content']/div[3]" position="before">
+            <div class="accordion-item">
+                <h2 id="o_wsale_offcanvas_stock_header" class="accordion-header mb-0">
+                    <button class="o_wsale_offcanvas_title accordion-button rounded-0 collapsed"
+                            type="button"
+                            data-bs-toggle="collapse"
+                            data-bs-target="#o_wsale_offcanvas_stock"
+                            aria-expanded="false"
+                            aria-controls="o_wsale_offcanvas_stock">
+                        <b>Stock</b>
+                    </button>
+                </h2>
+                <div id="o_wsale_offcanvas_stock"
+                     class="accordion-collapse collapse"
+                     aria-labelledby="o_wsale_offcanvas_stock_header">
+                    <div class="accordion-body pt-0">
+                        <form class="js_attributes position-relative mb-2" method="get">
+                            <input t-if="category" type="hidden" name="category" t-att-value="category.id"/>
+                            <input type="hidden" name="search" t-att-value="search"/>
+                            <input type="hidden" name="order" t-att-value="order"/>
+
+                            <div>
+                                <div class="form-check mb-1" title="Stock">
+                                    <input type="radio"
+                                           name="stock"
+                                           class="form-check-input"
+                                           id="in_stock"
+                                           value="in_stock"
+                                           t-att-checked="'checked' if stock_filter == 'in_stock' else None"
+                                           onclick="this.form.submit();"/>
+                                    <label class="form-check-label fw-normal" for="in_stock">In Stock</label>
+                                </div>
+                                <div class="form-check mb-1" title="Stock">
+                                    <input type="radio"
+                                           name="stock"
+                                           class="form-check-input"
+                                           id="out_stock"
+                                           value="out_stock"
+                                           t-att-checked="'checked' if stock_filter == 'out_stock' else None"
+                                           onclick="this.form.submit();"/>
+                                    <label class="form-check-label fw-normal" for="out_stock">Out Stock</label>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </xpath>
+    </template>
 </odoo>
