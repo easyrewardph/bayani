@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="custom_products_attributes" inherit_id="website_sale.products" active="True"
+              name="Custom Attributes &amp; Variants filters">
+        <xpath expr="//div[contains(@class, 'products_attributes_filters')]" position="inside">
+            <div id="wsale_products_attributes_collapse" class="position-relative">
+                <form class="js_attributes position-relative mb-2" method="get">
+                    <input t-if="category" type="hidden" name="category" t-att-value="category.id"/>
+                    <input type="hidden" name="search" t-att-value="search"/>
+                    <input type="hidden" name="order" t-att-value="order"/>
+
+                    <div>
+                        <h6>Stock</h6>
+                        <div class="form-check mb-1" title="Stock">
+                            <input type="radio"
+                                   name="stock"
+                                   class="form-check-input"
+                                   id="in_stock"
+                                   value="in_stock"
+                                   t-att-checked="'checked' if stock_filter == 'in_stock' else None"
+                                   onclick="this.form.submit();"/>
+                            <label class="form-check-label fw-normal" for="in_stock">In Stock</label>
+                        </div>
+                        <div class="form-check mb-1" title="Stock">
+                            <input type="radio"
+                                   name="stock"
+                                   class="form-check-input"
+                                   id="out_stock"
+                                   value="out_stock"
+                                   t-att-checked="'checked' if stock_filter == 'out_stock' else None"
+                                   onclick="this.form.submit();"/>
+                            <label class="form-check-label fw-normal" for="out_stock">Out Stock</label>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </xpath>
+    </template>
+</odoo>
