@@ -38,9 +38,9 @@ class CustomWebsiteSale(WebsiteSale):
 
         search_result = details[0].get('results', request.env['product.template']).with_context(bin_size=True)
         if post.get('stock') == 'in_stock':
-            search_result = request.env['product.template'].with_context(bin_size=True).search([('id', 'in', search_result.ids), ('qty_available','>', 0)])
+            search_result = request.env['product.template'].sudo().with_context(bin_size=True).search([('id', 'in', search_result.ids), ('qty_available','>', 0)])
         if post.get('stock') == 'out_stock':
-            search_result = request.env['product.template'].with_context(bin_size=True).search(
+            search_result = request.env['product.template'].sudo().with_context(bin_size=True).search(
                 [('id', 'in', search_result.ids), ('qty_available', '=', 0)])
 
         return fuzzy_search_term, product_count, search_result
