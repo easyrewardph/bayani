@@ -1,6 +1,7 @@
 from odoo import http
-from odoo.http import request, route
 from odoo.addons.website_sale.controllers.main import WebsiteSale
+from odoo.http import request
+
 
 class CustomWebsiteSale(WebsiteSale):
     @http.route([
@@ -11,10 +12,8 @@ class CustomWebsiteSale(WebsiteSale):
     ], type='http', auth="public", website=True, )
     def shop(self, page=0, category=None, search='', ppg=False, stock=None, **post):
 
-
         response = super(CustomWebsiteSale, self).shop(page=page, category=category, search=search, stock=stock,
                                                        ppg=ppg, **post)
-
 
         products = response.qcontext.get('products')
         for prod in products:
@@ -38,10 +37,24 @@ class CustomWebsiteSale(WebsiteSale):
 
         search_result = details[0].get('results', request.env['product.template']).with_context(bin_size=True)
         if post.get('stock') == 'in_stock':
-            search_result = request.env['product.template'].sudo().with_context(bin_size=True).search([('id', 'in', search_result.ids), ('qty_available','>', 0)])
+            search_result = request.env['product.template'].sudo().with_context(bin_size=True).search(
+                [('id', 'in', search_result.ids), ('qty_available', '>', 0)])
         if post.get('stock') == 'out_stock':
             search_result = request.env['product.template'].sudo().with_context(bin_size=True).search(
                 [('id', 'in', search_result.ids), ('qty_available', '=', 0)])
 
         return fuzzy_search_term, product_count, search_result
 
+    def _shop_get_query_url_kwargs(self, category, search, min_price, max_price, attrib=None, order=None, tags=None,
+                                   **post):
+        """
+        Super Call the method and added Stock Filter Keep while changed the Another Filter or category.
+
+        """
+        res = super()._shop_get_query_url_kwargs(category=category, search=search, min_price=min_price,
+                                                 max_price=max_price, attrib=attrib, order=order, tags=tags, **post)
+        if post.get('stock'):
+            res.update({
+                'stock': post.get('stock')
+            })
+        return res

@@ -2,7 +2,7 @@
 <odoo>
     <template id="custom_products_attributes" inherit_id="website_sale.products" active="True"
               name="Custom Attributes &amp; Variants filters">
-        <xpath expr="//div[contains(@class, 'products_attributes_filters')]" position="before">
+        <xpath expr="//div[contains(@class, 'o_wsale_products_grid_before_rail')]/div[1]" position="before">
             <div id="wsale_products_attributes_collapse" class="position-relative">
                 <form class="js_attributes position-relative mb-2" method="get">
                     <input t-if="category" type="hidden" name="category" t-att-value="category.id"/>
