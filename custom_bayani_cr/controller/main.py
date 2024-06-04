@@ -1,4 +1,4 @@
-from odoo import http
+from odoo import http, _
 from odoo.addons.website.controllers.main import Website
 from odoo.addons.website_sale.controllers import main as website_sale_controller_custom
 from odoo.http import request
@@ -22,3 +22,11 @@ class WebsiteSale(website_sale_controller_custom.WebsiteSale):
     def _prepare_product_values(self, product, category='', search='', **kwargs):
         product = request.env['product.template'].sudo().browse(int(product.id))
         return super()._prepare_product_values(product, category, search, **kwargs)
+
+    def _get_shop_payment_values(self, order, **kwargs):
+        """Super Call this method due to 'Pay Now' button label change 'Confirm Order'."""
+
+        res = super()._get_shop_payment_values(order=order, kwargs=kwargs)
+        if res.get('submit_button_label'):
+            res.update({'submit_button_label': _('Confirm Order')})
+        return res

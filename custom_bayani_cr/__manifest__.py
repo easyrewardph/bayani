@@ -8,7 +8,7 @@
     'author': "Candidroot Solutions Pvt. Ltd.",
     'description': """This module helps to Hide the price,Cart Button and quantity of the product if user is not login.""",
     'sequence': 8,
-    'depends': ['website_sale','website_sale_wishlist','product_expiry','stock'],
+    'depends': ['website_sale', 'website_sale_wishlist', 'product_expiry', 'stock', 'website', 'sale'],
     'data': [
         'views/website_template_inherit.xml',
         'views/res_config_view.xml',

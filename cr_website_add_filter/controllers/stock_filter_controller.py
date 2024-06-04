@@ -12,6 +12,8 @@ class CustomWebsiteSale(WebsiteSale):
     ], type='http', auth="public", website=True, )
     def shop(self, page=0, category=None, search='', ppg=False, stock=None, **post):
 
+        if not stock:
+            stock = 'in_stock'
         response = super(CustomWebsiteSale, self).shop(page=page, category=category, search=search, stock=stock,
                                                        ppg=ppg, **post)
 
