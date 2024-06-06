@@ -94,7 +94,20 @@
     </template>
 
 
+    <!--    Search Panel Hide based on condition in website Configuration (Web view)-->
     <template id="template_header_sidebar_bayani" inherit_id="website.template_header_sidebar">
+        <xpath expr="//t[@t-call='website.placeholder_header_search_box']" position="replace">
+            <t t-call="website.placeholder_header_search_box" t-if="website.is_search_panel_shown_in_website">
+                <t t-set="_classes" t-valuef="mb-3"/>
+                <t t-set="_input_classes" t-valuef="rounded-start-pill ps-3 text-bg-light"/>
+                <t t-set="_submit_classes" t-valuef="rounded-end-pill pe-3 bg-o-color-3"/>
+                <t t-set="limit" t-valuef="0"/>
+            </t>
+        </xpath>
+    </template>
+
+    <!--    Search Panel Hide based on condition in website Configuration (Mobile view)-->
+    <template id="template_header_mobile_bayani" inherit_id="website.template_header_mobile">
         <xpath expr="//t[@t-call='website.placeholder_header_search_box']" position="replace">
             <t t-call="website.placeholder_header_search_box" t-if="website.is_search_panel_shown_in_website">
                 <t t-set="_classes" t-valuef="mb-3"/>
