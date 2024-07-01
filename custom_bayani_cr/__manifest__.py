@@ -10,10 +10,20 @@
     'sequence': 8,
     'depends': ['website_sale', 'website_sale_wishlist', 'product_expiry', 'stock', 'website', 'sale'],
     'data': [
+        'data/contact_tag.xml',
         'views/website_template_inherit.xml',
         'views/res_config_view.xml',
         'views/web_client_template.xml',
+        'views/website_page.xml',
+        'views/website_thankyou_page.xml',
+        'views/website_menu.xml',
     ],
+    'assets': {
+        'web.assets_frontend': [
+            'custom_bayani_cr/static/src/scss/product_page.scss',
+            'custom_bayani_cr/static/src/js/custom_qty_selection.js',
+        ],
+    },
     'license': 'LGPL-3',
     'installable': True,
     'auto_install': False,

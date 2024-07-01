@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+    <data>
+        <record id="res_partner_category_account_open" model="res.partner.category">
+            <field name="name">Request for Account</field>
+            <field name="color" eval="2"/>
+        </record>
+    </data>
+</odoo>

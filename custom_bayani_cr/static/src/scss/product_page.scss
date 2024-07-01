@@ -1,0 +1,18 @@
+@media(max-width:768px){
+    .custom_selector_qty{
+        margin-bottom:10px !important;
+    }
+}
+
+.available-qty-button {
+        display: inline-block;
+        padding: 10px 20px;
+        margin: -20px 0;
+        font-size: 18px;
+        color: white;
+        background-color: #FF5733;
+        border-radius: 5px;
+        text-align: center;
+        text-decoration: none;
+        cursor: default;
+    }
