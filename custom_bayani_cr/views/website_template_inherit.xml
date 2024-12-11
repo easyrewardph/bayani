@@ -21,6 +21,23 @@
             </attribute>
         </xpath>
     </template>
+
+    <template id="products_add_to_cart_custom" inherit_id="website_sale.products_add_to_cart">
+         <xpath expr="//a[@t-if='product._website_show_quick_add()']" position="attributes">
+            <attribute name="t-if">
+                user_id.id != request.env.ref('base.public_user').id
+            </attribute>
+        </xpath>
+    </template>
+
+    <template id="products_product_wishlist_add_to_cart_custom" inherit_id="website_sale_wishlist.product_wishlist">
+         <xpath expr="//button[@id='add_to_cart_button']" position="attributes">
+            <attribute name="t-if">
+                user_id.id != request.env.ref('base.public_user').id
+            </attribute>
+        </xpath>
+    </template>
+
     <template id="product_custom" inherit_id="website_sale.product">
         <xpath expr="//a[@id='add_to_cart']" position="attributes">
             <attribute name="t-if">
