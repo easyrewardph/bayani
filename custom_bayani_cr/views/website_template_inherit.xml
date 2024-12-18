@@ -80,11 +80,13 @@
         </xpath>
 
         <xpath expr="//div[@id='o_product_terms_and_share']" position="after">
-            <div class="mt-0">
-                <span t-attf-class="available-qty-button">Available Qty :
-                    <t t-esc="int(product.qty_available)"/>
-                </span>
-            </div>
+            <t t-if="user_id.id != request.env.ref('base.public_user').id">
+                <div class="mt-0">
+                    <span t-attf-class="available-qty-button">Available Qty :
+                        <t t-esc="int(product.qty_available)"/>
+                    </span>
+                </div>
+            </t>
         </xpath>
     </template>
     <template id="custom_product_price" inherit_id="website_sale.products_item" priority="15">
