@@ -1,5 +1,9 @@
 from odoo import models, api, _
-from odoo.tools import is_html_empty, html_keep_url
+# from odoo.tools import is_html_empty, html_keep_url
+from odoo.tools.mail import html_keep_url
+from odoo.tools import (
+    is_html_empty
+)
 
 
 class AccountMove(models.Model):

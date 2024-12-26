@@ -1,7 +1,7 @@
 # __manifest__.py
 {
     'name': 'Website Add Filter',
-    'version': '17.0.0.1',
+    'version': '18.0.0.1',
     'summary': 'Website add Filter in IN_stock and out_stock',
     'author': 'candidroot',
     'category': 'website',
