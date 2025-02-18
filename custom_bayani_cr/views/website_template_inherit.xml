@@ -23,7 +23,7 @@
     </template>
 
     <template id="products_add_to_cart_custom" inherit_id="website_sale.products_add_to_cart">
-         <xpath expr="//a[@t-if='product._website_show_quick_add()']" position="attributes">
+        <xpath expr="//a[@t-if='product._website_show_quick_add()']" position="attributes">
             <attribute name="t-if">
                 user_id.id != request.env.ref('base.public_user').id
             </attribute>
@@ -31,7 +31,7 @@
     </template>
 
     <template id="products_product_wishlist_add_to_cart_custom" inherit_id="website_sale_wishlist.product_wishlist">
-         <xpath expr="//button[@id='add_to_cart_button']" position="attributes">
+        <xpath expr="//button[@id='add_to_cart_button']" position="attributes">
             <attribute name="t-if">
                 user_id.id != request.env.ref('base.public_user').id
             </attribute>
@@ -100,7 +100,8 @@
         <xpath expr="//div[hasclass('o_wsale_product_btn')]" position="inside">
             <t t-set="combination" t-value="product._get_first_possible_combination()"/>
             <t t-set="combination_info" t-value="product._get_combination_info(combination, add_qty=add_qty)"/>
-            <div t-if="user_id.id != request.env.ref('base.public_user').id" t-attf-class="custom_selector_qty css_quantity input-group {{'d-none' if combination_info['prevent_zero_price_sale'] else 'd-inline-flex'}} me-2 align-middle"
+            <div t-if="user_id.id != request.env.ref('base.public_user').id"
+                 t-attf-class="custom_selector_qty css_quantity input-group {{'d-none' if combination_info['prevent_zero_price_sale'] else 'd-inline-flex'}} me-2 align-middle"
                  contenteditable="false">
                 <a t-attf-href="#" class="btn btn-link js_add_cart_json" aria-label="Remove one" title="Remove one">
                     <i class="fa fa-minus"></i>
@@ -136,6 +137,28 @@
                     </t>
                 </small>
             </td>
+        </xpath>
+    </template>
+
+    <!--    Remove Price From Optional Products in Product Form in website (Public User)-->
+    <template id="price_dynamic_filter_template_product_product_inherit"
+              inherit_id="website_sale.price_dynamic_filter_template_product_product">
+        <xpath expr="." position="replace">
+            <t t-if="request.env.user.id != request.env.ref('base.public_user').id">
+                <t t-if="data.get('prevent_zero_price_sale')">
+                    <span t-field="website.prevent_zero_price_sale_text"/>
+                </t>
+                <t t-elif="not data.get('is_sample')">
+                    <span t-esc="data['price']"
+                          class="fw-bold"
+                          name="product_price"
+                          t-options="{'widget': 'monetary', 'display_currency': website.currency_id}"/>
+                    <del t-if="data.get('has_discounted_price')" class="text-danger ms-1 h6"
+                         style="white-space: nowrap;"
+                         t-esc="data['list_price']"
+                         t-options="{'widget': 'monetary', 'display_currency': website.currency_id}"/>
+                </t>
+            </t>
         </xpath>
     </template>
 
