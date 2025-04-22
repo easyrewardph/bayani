@@ -1,0 +1,175 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <!--        INVOICE-->
+        <template id="report_invoice_document_custom" inherit_id="account.report_invoice_document">
+            <xpath expr="//div[hasclass('row')][1]/t/div[1]" position="replace">
+                <!--                ADDRESS PART-->
+                <div class="col-6">
+                    <t t-set="information_block">
+                        <div groups="account.group_delivery_invoice_address" name="shipping_address_block">
+                            <strong>Deliver To:</strong>
+                            <div t-field="o.partner_shipping_id"
+                                 t-options="{&quot;widget&quot;: &quot;contact&quot;, &quot;fields&quot;: [&quot;address&quot;, &quot;name&quot;], &quot;no_marker&quot;: True}"/>
+                        </div>
+                    </t>
+                </div>
+            </xpath>
+            <xpath expr="//tbody" position="before">
+                <t t-set="counter" t-value="o.check_font_limit()"/>
+            </xpath>
+            <xpath expr="//t[@t-set='lines']" position="after">
+                <t t-set="lines" t-value="o.reorder_lines(lines)"/>
+            </xpath>
+            <xpath expr="//div[hasclass('row')][1]/t/div[2]" position="replace">
+                <div class="col-6" name="address_not_same_as_shipping">
+                    <t t-set="address">
+                        <strong>Invoice To:</strong>
+                        <address class="mb-0" t-field="o.partner_id"
+                                 t-options="{&quot;widget&quot;: &quot;contact&quot;, &quot;fields&quot;: [&quot;address&quot;, &quot;name&quot;], &quot;no_marker&quot;: True}"/>
+                        <div t-if="o.partner_id.vat" id="partner_vat_address_not_same_as_shipping">
+                            <t t-if="o.company_id.account_fiscal_country_id.vat_label"
+                               t-out="o.company_id.account_fiscal_country_id.vat_label" id="inv_tax_id_label"/>
+                            <t t-else="">Tax ID</t>:
+                            <span t-field="o.partner_id.vat"/>
+                        </div>
+                    </t>
+                </div>
+            </xpath>
+            <!--            PRODUCT LINES-->
+            <xpath expr="//td[@name='account_invoice_line_name']" position="replace">
+                <td name="account_invoice_line_name">
+                    <t t-if="counter > 0">
+                        <span t-if="line.name" t-field="line.name" t-options="{'widget': 'text'}"
+                              style="font-size:12px;">Bacon Burger
+                        </span>
+                    </t>
+                    <t t-else="">
+                        <span t-if="line.name" t-field="line.name" t-options="{'widget': 'text'}">Bacon Burger</span>
+                    </t>
+                </td>
+            </xpath>
+
+            <xpath expr="//thead/tr/th[@name='th_taxes']" position="before">
+                <th name="th_expiry_date" class="text-end text-nowrap">Expiry Date</th>
+            </xpath>
+            <xpath expr="//td[@name='td_taxes']" position="before">
+                <t t-set="exp" t-value="line.get_expiry_date()"/>
+                <td name="td_expiry_date" class="text-end">
+                    <span t-esc="exp">-</span>
+                </td>
+            </xpath>
+            <xpath expr="//thead/tr/th[@name='th_priceunit']" position="before">
+                <th name="th_box_price" class="text-end text-nowrap">Box Price</th>
+            </xpath>
+            <xpath expr="//td[@name='td_price_unit']" position="before">
+                <t t-set="t" t-value="round(line.price_unit * line.quantity,2)"/>
+                <td name="td_box_price" t-attf-class="text-end">
+                    <span class="text-nowrap" t-esc="t">9.00</span>
+                </td>
+            </xpath>
+            <xpath expr="//div[@id='payment_term']" position="replace">
+<!--                <h1></h1>-->
+            </xpath>
+        </template>
+        <template id="account_report_invoice_document_custom" inherit_id="account_accountant.report_invoice_document">
+            <xpath expr="//div[@t-if='o.show_signature_area']" position="replace">
+                    <div t-if="o.show_signature_area" t-attf-class="#{'col-12' if report_type != 'html' else 'col-lg-5 offset-lg-7 col-md-12'}">
+                        <t t-if="o.signature">
+                            <img t-if="o.signature" t-att-src="image_data_uri(o.signature)" class="img-fluid mx-auto" style="max-height: 6rem;"/>
+                        </t>
+                        <t t-else="">
+                            <!-- leave an empty space allowing to sign the invoice manually -->
+                            <div class="col-12" style="min-height: 10rem"/>
+                        </t>
+                        <!-- wkhtmltopdf doesn't render a simple `border-top border-dark` -->
+                        <p class="mx-auto" style="border-top: thin solid;">
+                            Received by:                 <br/>
+                            Name:                        <br/>
+                            Sign:                        <br/>
+                            Date:                        <br/>
+                            "I/We acknowledge full receipt of the goods described in this copy of our customer invoice and agree to abide by the terms and conditions of supply by Bayani Imports Pty Ltd on website (https://bayani.com.au/terms)."
+                        </p>
+                    </div>
+            </xpath>
+        </template>
+
+
+        <!--        SALE ORDER-->
+        <template id="report_saleorder_document_custom" inherit_id="sale.report_saleorder_document">
+            <xpath expr="//t[@t-set='information_block']" position="replace">
+                <t t-set="information_block">
+                    <strong>
+                        <t t-if="doc.partner_shipping_id == doc.partner_invoice_id">
+                            Invoice and Deliver To:
+                        </t>
+                        <t t-else="">
+                            Invoice To:
+                        </t>
+                    </strong>
+                    <div t-field="doc.partner_invoice_id"
+                         t-options="{&quot;widget&quot;: &quot;contact&quot;, &quot;fields&quot;: [&quot;address&quot;, &quot;name&quot;, &quot;phone&quot;], &quot;no_marker&quot;: True, &quot;phone_icons&quot;: True}"/>
+                    <t t-if="doc.partner_shipping_id != doc.partner_invoice_id">
+                        <strong>Deliver To:</strong>
+                        <div t-field="doc.partner_shipping_id"
+                             t-options="{&quot;widget&quot;: &quot;contact&quot;, &quot;fields&quot;: [&quot;address&quot;, &quot;name&quot;, &quot;phone&quot;], &quot;no_marker&quot;: True, &quot;phone_icons&quot;: True}"/>
+                    </t>
+                </t>
+            </xpath>
+            <xpath expr="//tbody" position="before">
+                <t t-set="counter" t-value="doc.check_font_limit()"/>
+            </xpath>
+            <xpath expr="//t[@t-set='lines_to_report']" position="after">
+                <t t-set="lines_to_report" t-value="doc.reorder_lines(lines_to_report)"/>
+            </xpath>
+            <xpath expr="//td[@name='td_name']" position="replace">
+                <td name="td_name">
+                    <t t-if="counter > 0">
+                        <span t-field="line.name" style="font-size:12px;">Bacon Burger</span>
+                    </t>
+                    <t t-else="">
+                        <span t-field="line.name">Bacon Burger</span>
+                    </t>
+                </td>
+            </xpath>
+            <xpath expr="//thead/tr/th[@name='th_taxes']" position="before">
+                <th name="th_expiry_date" class="text-end text-nowrap">Expiry Date</th>
+            </xpath>
+            <xpath expr="//td[@name='td_taxes']" position="before">
+                <t t-set="exp" t-value="line.get_saleline_expiry_date()"/>
+                <td name="td_expiry_date" class="text-end">
+                    <span t-esc="exp">-</span>
+                </td>
+            </xpath>
+            <xpath expr="//thead/tr/th[@name='th_priceunit']" position="before">
+                <th name="th_box_price" class="text-end text-nowrap">Box Price</th>
+            </xpath>
+            <xpath expr="//td[@name='td_priceunit']" position="before">
+                <t t-set="t" t-value="round(line.price_unit * line.product_uom_qty,2)"/>
+                <td name="td_box_price" t-attf-class="text-end">
+                    <span class="text-nowrap" t-esc="t">9.00</span>
+                </td>
+            </xpath>
+            <xpath expr="//span[@name='order_note']" position="replace"/>
+            <xpath expr="//div[@name='signature']" position="after">
+                <div class="clearfix">
+                    <div t-attf-class="#{'col-6' if report_type != 'html' else 'col-12 col-md-5'} ms-6 mt-2 d-inline-block float-end">
+                        <p class="mx-auto" style="border-top: thin solid;page-break-inside: avoid;">
+                            Received by:
+                            <br/>
+                            Name:
+                            <br/>
+                            Sign:
+                            <br/>
+                            Date:
+                            <br/>
+                            "I/We acknowledge full receipt of the goods described in this copy of our customer invoice
+                            and agree to abide by the terms and conditions of supply by Bayani Imports Pty Ltd on
+                            website (https://bayani.com.au/terms)."
+                        </p>
+                    </div>
+                </div>
+            </xpath>
+        </template>
+    </data>
+</odoo>

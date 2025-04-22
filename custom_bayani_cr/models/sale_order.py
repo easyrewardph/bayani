@@ -24,3 +24,46 @@ class SaleOrder(models.Model):
                 del context
             elif not is_html_empty(self.env.company.invoice_terms):
                 order.note = order.with_context(lang=order.partner_id.lang).env.company.invoice_terms
+
+    def check_font_limit(self):
+        for line in self.order_line:
+            if len(line.display_name) > 51:
+                return 1
+
+        return 0
+
+    def reorder_lines(self, base_lines):
+        sale_order_line_forzen = self.env['sale.order.line']
+        sale_order_line_dry = self.env['sale.order.line']
+        lines = base_lines.filtered(lambda s: s.product_id)
+
+        forzen_product = sorted(
+            lines.filtered(lambda l: l.product_id.categ_id.is_forzen),
+            key=lambda l: l.product_id.name
+        )
+        for r in forzen_product:
+            sale_order_line_forzen += r
+
+        dry_product = lines - sale_order_line_forzen
+        dry_product = sorted(dry_product,key=lambda l: l.product_id.name)
+        for d in dry_product:
+            sale_order_line_dry += d
+        final = sale_order_line_forzen + sale_order_line_dry
+        return final
+
+class SaleOrderLine(models.Model):
+    _inherit = "sale.order.line"
+
+    def get_saleline_expiry_date(self):
+        if self and self.move_ids:
+            move = self.move_ids
+            if move:
+                line = self.env['stock.move.line'].sudo().search([('move_id', '=', int(move[0].id))])
+                if line.mapped('lot_id') and line.mapped('lot_id').mapped('expiration_date'):
+                    return str(max(line.mapped('lot_id').mapped('expiration_date')).date())
+                else:
+                    return '-'
+            else:
+                return '-'
+        else:
+            return '-'

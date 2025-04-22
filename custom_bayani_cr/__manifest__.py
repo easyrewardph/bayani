@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 {
     'name': 'Hide Price, Add To Cart Button, Quantity From website',
     'category': 'eCommerce',
@@ -11,12 +10,15 @@
     'depends': ['website_sale', 'website_sale_wishlist', 'product_expiry', 'stock', 'website', 'sale'],
     'data': [
         'data/contact_tag.xml',
+        'views/product_category.xml',
         'views/website_template_inherit.xml',
         'views/res_config_view.xml',
         'views/web_client_template.xml',
         'views/website_page.xml',
         'views/website_thankyou_page.xml',
         'views/website_menu.xml',
+        'views/report_layout_extend.xml',
+        'views/report_extend.xml',
     ],
     'assets': {
         'web.assets_frontend': [
@@ -29,3 +31,4 @@
     'auto_install': False,
     'application': True,
 }
+# -*- coding: utf-8 -*-

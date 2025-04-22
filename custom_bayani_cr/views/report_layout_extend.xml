@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <template id="address_layout_custom" inherit_id="web.address_layout">
+            <xpath expr="div[1]" position="replace">
+                <div t-if="address" t-attf-class="address mb-4"
+                     title="This block is not always present depending on the printed document." style="margin-top:1px !important;padding-top:1px !important;">
+                    <t t-if="information_block">
+                        <t t-set="colclass" t-value="'col-5 offset-1'"/>
+                        <div name="information_block" class="col-6">
+                            <t t-out="information_block or None">
+                                <div class="bg-light border-1 rounded h-100 d-flex flex-column align-items-center justify-content-center p-4 opacity-75 text-muted text-center">
+                                    <strong>Information block</strong>
+                                    <div>Usually contains a source address or a complementary address.</div>
+                                </div>
+                            </t>
+                        </div>
+                    </t>
+
+                    <div name="address"
+                         t-att-class="not custom_layout_address or information_block" style="margin-top:2px !important;">
+                        <t t-esc="address or None">
+                            <div class="bg-light border-1 rounded h-100 d-flex flex-column align-items-center justify-content-center p-4 opacity-75 text-muted text-center">
+                                <strong>Address block</strong>
+                                <div>Usually contains the address of the document's recipient.</div>
+                            </div>
+                        </t>
+                    </div>
+                </div>
+            </xpath>
+        </template>
+    </data>
+</odoo>
