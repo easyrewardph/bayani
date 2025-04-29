@@ -36,6 +36,18 @@
                     </t>
                 </div>
             </xpath>
+            <xpath expr="//div[@name='address_same_as_shipping']" position="replace">
+                <div class="offset-col-6 col-6" name="address_same_as_shipping">
+                    <t t-set="address">
+                        <strong>Deliver To:</strong>
+                        <address class="mb-0" t-field="o.partner_id" t-options="{&quot;widget&quot;: &quot;contact&quot;, &quot;fields&quot;: [&quot;address&quot;, &quot;name&quot;], &quot;no_marker&quot;: True}"/>
+                        <div t-if="o.partner_id.vat" id="partner_vat_address_same_as_shipping">
+                            <t t-if="o.company_id.account_fiscal_country_id.vat_label" t-out="o.company_id.account_fiscal_country_id.vat_label" id="inv_tax_id_label"/>
+                            <t t-else="">Tax ID</t>: <span t-field="o.partner_id.vat"/>
+                        </div>
+                    </t>
+                </div>
+            </xpath>
             <!--            PRODUCT LINES-->
             <xpath expr="//td[@name='account_invoice_line_name']" position="replace">
                 <td name="account_invoice_line_name">
@@ -68,6 +80,12 @@
                     <span class="text-nowrap" t-esc="t">9.00</span>
                 </td>
             </xpath>
+            <xpath expr="//td[@name='td_price_unit']" position="replace">
+                <td name="td_price_unit" t-attf-class="text-end {{ 'd-none d-md-table-cell' if report_type == 'html' else '' }}">
+                    <span class="text-nowrap" t-field="line.product_id.base_unit_price">9.00</span>
+                </td>
+            </xpath>
+
             <xpath expr="//div[@id='payment_term']" position="replace">
 <!--                <h1></h1>-->
             </xpath>
@@ -83,7 +101,7 @@
                             <div class="col-12" style="min-height: 10rem"/>
                         </t>
                         <!-- wkhtmltopdf doesn't render a simple `border-top border-dark` -->
-                        <p class="mx-auto" style="border-top: thin solid;">
+                        <p class="mx-auto" style="border-top: thin solid;page-break-inside: avoid;">
                             Received by:                 <br/>
                             Name:                        <br/>
                             Sign:                        <br/>
@@ -97,6 +115,19 @@
 
         <!--        SALE ORDER-->
         <template id="report_saleorder_document_custom" inherit_id="sale.report_saleorder_document">
+            <xpath expr="//t[@t-set='address']" position="replace">
+                 <t t-set="address">
+                     <t t-if="doc.partner_shipping_id == doc.partner_invoice_id == doc.partner_id">
+                        <strong>Deliver To:</strong>
+                    </t>
+                    <div t-field="doc.partner_id"
+                        t-options='{"widget": "contact", "fields": ["address", "name"], "no_marker": True}' />
+                    <p t-if="doc.partner_id.vat">
+                        <t t-if="doc.company_id.account_fiscal_country_id.vat_label" t-out="doc.company_id.account_fiscal_country_id.vat_label"/>
+                        <t t-else="">Tax ID</t>: <span t-field="doc.partner_id.vat"/>
+                    </p>
+                </t>
+            </xpath>
             <xpath expr="//t[@t-set='information_block']" position="replace">
                 <t t-set="information_block">
                     <strong>
@@ -148,6 +179,11 @@
                 <t t-set="t" t-value="round(line.price_unit * line.product_uom_qty,2)"/>
                 <td name="td_box_price" t-attf-class="text-end">
                     <span class="text-nowrap" t-esc="t">9.00</span>
+                </td>
+            </xpath>
+            <xpath expr="//td[@name='td_priceunit']" position="replace">
+                <td name="td_priceunit" class="text-end text-nowrap">
+                    <span t-field="line.product_id.base_unit_price">3</span>
                 </td>
             </xpath>
             <xpath expr="//span[@name='order_note']" position="replace"/>
