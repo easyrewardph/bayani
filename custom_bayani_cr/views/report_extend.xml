@@ -183,6 +183,95 @@
                 </tr>
 
             </xpath>
+            <xpath expr="//t[@t-foreach='lines']" position="after">
+                <tr>
+                    <td colspan="2"></td>
+                    <td><span>Total Box: = </span><span t-esc="sum(lines.mapped('quantity'))"/> </td>
+                    <td colspan="4" style="padding: 0; border: none;">
+                    <style>
+                        .no-border-table,
+                        .no-border-table td,
+                        .no-border-table th,
+                        .no-border-table tr {
+                            border: none !important;
+                            outline: none !important;
+                            box-shadow: none !important;
+                        }
+
+                        .no-border-table {
+                            border-collapse: collapse !important;
+                            width: 100%;
+                        }
+                        .no-border-table td {
+                            padding: 6px 10px !important; /* top-bottom, left-right */
+                        }
+                    </style>
+
+                    <table class="no-border-table">
+                        <t t-if="o.tax_totals">
+                            <t t-set="tax_totals" t-value="o.tax_totals"/>
+                            <t t-set="currency" t-value="o.currency_id"/>
+                            <t t-set="same_tax_base" t-value="tax_totals['same_tax_base']"/>
+                            <t t-foreach="tax_totals['subtotals']" t-as="subtotal">
+                                <tr class="o_subtotal">
+                                    <td>
+                                        <span t-out="subtotal['name']"/>
+                                    </td>
+                                    <td class="text-end">
+                                        <span t-out="subtotal['base_amount_currency']"
+                                              t-options="{'widget': 'monetary', 'display_currency': currency}"/>
+                                    </td>
+                                </tr>
+                                <t t-foreach="subtotal['tax_groups']" t-as="tax_group">
+                                    <tr class="o_taxes">
+                                        <t t-if="same_tax_base or tax_group['display_base_amount_currency'] is None">
+                                            <td>
+                                                <span class="text-nowrap" t-out="tax_group['group_name']"/>
+                                            </td>
+                                            <td class="text-end">
+                                                <span class="text-nowrap"
+                                                      t-out="tax_group['tax_amount_currency']"
+                                                      t-options="{'widget': 'monetary', 'display_currency': currency}"/>
+                                            </td>
+                                        </t>
+                                        <t t-else="">
+                                            <td>
+                                                <span t-out="tax_group['group_name']"/> on
+                                                <span class="text-nowrap"
+                                                      t-out="tax_group['display_base_amount_currency']"
+                                                      t-options="{'widget': 'monetary', 'display_currency': currency}"/>
+                                            </td>
+                                            <td class="text-end">
+                                                <span class="text-nowrap"
+                                                      t-out="tax_group['tax_amount_currency']"
+                                                      t-options="{'widget': 'monetary', 'display_currency': currency}"/>
+                                            </td>
+                                        </t>
+                                    </tr>
+                                </t>
+                            </t>
+
+                            <tr t-if="'cash_rounding_base_amount_currency' in tax_totals">
+                                <td>Rounding</td>
+                                <td class="text-end">
+                                    <span t-out="tax_totals['cash_rounding_base_amount_currency']"
+                                          t-options="{'widget': 'monetary', 'display_currency': currency}"/>
+                                </td>
+                            </tr>
+
+                            <tr style="background-color:#dc3545;color:white !important;">
+                                <td><strong>Total</strong></td>
+                                <td class="text-end">
+                                    <strong t-out="tax_totals['total_amount_currency']"
+                                            t-options="{'widget': 'monetary', 'display_currency': currency}"/>
+                                </td>
+                            </tr>
+                        </t>
+                    </table>
+                    </td>
+                </tr>
+            </xpath>
+            <xpath expr="//div[@id='total']" position="replace"/>
 
 
 <!--            <xpath expr="//thead/tr/th[@name='th_taxes']" position="before">-->
@@ -465,6 +554,94 @@
 <!--                    </div>-->
 <!--                </div>-->
 <!--            </xpath>-->
+            <xpath expr="//t[@t-foreach='lines_to_report']" position="after">
+                <tr>
+                    <td colspan="2"></td>
+                    <td><span>Total Box: = </span><span t-esc="sum(lines_to_report.mapped('product_uom_qty'))"/> </td>
+                    <td colspan="4" style="padding: 0; border: none;">
+                    <style>
+                        .no-border-table,
+                        .no-border-table td,
+                        .no-border-table th,
+                        .no-border-table tr {
+                            border: none !important;
+                            outline: none !important;
+                            box-shadow: none !important;
+                        }
+
+                        .no-border-table {
+                            border-collapse: collapse !important;
+                            width: 100%;
+                        }
+                        .no-border-table td {
+                            padding: 6px 10px !important; /* top-bottom, left-right */
+                        }
+                    </style>
+
+                    <table class="no-border-table">
+                        <t t-if="doc.tax_totals">
+                            <t t-set="tax_totals" t-value="doc.tax_totals"/>
+                            <t t-set="currency" t-value="doc.currency_id"/>
+                            <t t-set="same_tax_base" t-value="tax_totals['same_tax_base']"/>
+                            <t t-foreach="tax_totals['subtotals']" t-as="subtotal">
+                                <tr class="o_subtotal">
+                                    <td>
+                                        <span t-out="subtotal['name']"/>
+                                    </td>
+                                    <td class="text-end">
+                                        <span t-out="subtotal['base_amount_currency']"
+                                              t-options="{'widget': 'monetary', 'display_currency': currency}"/>
+                                    </td>
+                                </tr>
+                                <t t-foreach="subtotal['tax_groups']" t-as="tax_group">
+                                    <tr class="o_taxes">
+                                        <t t-if="same_tax_base or tax_group['display_base_amount_currency'] is None">
+                                            <td>
+                                                <span class="text-nowrap" t-out="tax_group['group_name']"/>
+                                            </td>
+                                            <td class="text-end">
+                                                <span class="text-nowrap"
+                                                      t-out="tax_group['tax_amount_currency']"
+                                                      t-options="{'widget': 'monetary', 'display_currency': currency}"/>
+                                            </td>
+                                        </t>
+                                        <t t-else="">
+                                            <td>
+                                                <span t-out="tax_group['group_name']"/> on
+                                                <span class="text-nowrap"
+                                                      t-out="tax_group['display_base_amount_currency']"
+                                                      t-options="{'widget': 'monetary', 'display_currency': currency}"/>
+                                            </td>
+                                            <td class="text-end">
+                                                <span class="text-nowrap"
+                                                      t-out="tax_group['tax_amount_currency']"
+                                                      t-options="{'widget': 'monetary', 'display_currency': currency}"/>
+                                            </td>
+                                        </t>
+                                    </tr>
+                                </t>
+                            </t>
+
+                            <tr t-if="'cash_rounding_base_amount_currency' in tax_totals">
+                                <td>Rounding</td>
+                                <td class="text-end">
+                                    <span t-out="tax_totals['cash_rounding_base_amount_currency']"
+                                          t-options="{'widget': 'monetary', 'display_currency': currency}"/>
+                                </td>
+                            </tr>
+
+                            <tr style="background-color:#dc3545;color:white !important;">
+                                <td><strong>Total</strong></td>
+                                <td class="text-end">
+                                    <strong t-out="tax_totals['total_amount_currency']"
+                                            t-options="{'widget': 'monetary', 'display_currency': currency}"/>
+                                </td>
+                            </tr>
+                        </t>
+                    </table>
+                    </td>
+                </tr>
+            </xpath>
             <xpath expr="//div[@name='total']" position="replace">
                 <div id="total" class="row mt-n3" name="total">
                     <div class="col-6" style="margin-top:12px;page-break-inside: avoid;">
@@ -483,13 +660,13 @@
                         </p>
                     </div>
                     <div t-attf-class="#{'col-6' if report_type != 'html' else 'col-sm-7 col-md-6'}">
-                        <table class="o_total_table table table-borderless">
-                            <!-- Tax totals -->
-                            <t t-call="sale.document_tax_totals">
-                                <t t-set="tax_totals" t-value="doc.tax_totals"/>
-                                <t t-set="currency" t-value="doc.currency_id"/>
-                            </t>
-                        </table>
+<!--                        <table class="o_total_table table table-borderless">-->
+<!--                            &lt;!&ndash; Tax totals &ndash;&gt;-->
+<!--                            <t t-call="sale.document_tax_totals">-->
+<!--                                <t t-set="tax_totals" t-value="doc.tax_totals"/>-->
+<!--                                <t t-set="currency" t-value="doc.currency_id"/>-->
+<!--                            </t>-->
+<!--                        </table>-->
                     </div>
                 </div>
 
