@@ -149,10 +149,10 @@
                         </td>
                         <td name="td_subtotal" class="text-end o_price_total">
                             <t t-if="counter > 0">
-                                <span class="text-nowrap" t-field="line.price_subtotal" style="font-size:12px;">27.00</span>
+                                <span class="text-nowrap" t-field="line.price_total" style="font-size:12px;">27.00</span>
                             </t>
                             <t t-else="">
-                                <span class="text-nowrap" t-field="line.price_subtotal">27.00</span>
+                                <span class="text-nowrap" t-field="line.price_total">27.00</span>
                             </t>
 
                         </td>
@@ -470,10 +470,10 @@
                         </td>
                         <td t-if="not line.is_downpayment" name="td_subtotal" class="text-end o_price_total">
                             <t t-if="counter > 0">
-                                <span t-field="line.price_subtotal" style="font-size:12px;">27.00</span>
+                                <span t-field="line.price_total" style="font-size:12px;">27.00</span>
                             </t>
                             <t t-else="">
-                                <span t-field="line.price_subtotal">27.00</span>
+                                <span t-field="line.price_total">27.00</span>
                             </t>
                         </td>
                     </t>
