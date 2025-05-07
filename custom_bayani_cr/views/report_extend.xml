@@ -187,7 +187,7 @@
                 <tr>
                     <td colspan="2"></td>
                     <td><span>Total Box: = </span><span t-esc="sum(lines.mapped('quantity'))"/> </td>
-                    <td colspan="4" style="padding: 0; border: none;">
+                    <td t-att-colspan="5 if display_discount else 4" style="padding: 0; border: none;">
                     <style>
                         .no-border-table,
                         .no-border-table td,
@@ -558,7 +558,7 @@
                 <tr>
                     <td colspan="2"></td>
                     <td><span>Total Box: = </span><span t-esc="sum(lines_to_report.mapped('product_uom_qty'))"/> </td>
-                    <td colspan="4" style="padding: 0; border: none;">
+                    <td t-att-colspan="5 if display_discount else 4" style="padding: 0; border: none;">
                     <style>
                         .no-border-table,
                         .no-border-table td,
