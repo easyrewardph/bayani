@@ -1,0 +1,57 @@
+.o_table_boxed, .o_table_boxed-rounded {
+    table:not(.o_ignore_layout_styling) {
+        position: relative;
+//         border: 1px solid #374151 !important;
+        &::before {
+            // Avoid inner borders overlapping the table borders
+            content: '';
+            // Position absolute will place the pseudo-element
+            // above the table. We need to prevent events on this pseudo-element
+            // to avoid messing up eventual user interaction with the table itself (report editor)
+            @include o-position-absolute(0, 0, 0, 0);
+            pointer-events: none;
+            border: 1px solid transparent;
+        }
+        .empty_space{
+            border: 1px solid transparent !important;
+//             border-right: 1px solid #374151 !important;
+        }
+        .empty_space_box{
+            border: 1px solid transparent !important;
+            border-right: 1px solid #374151 !important;
+            border-left: none !important;
+            padding: 0 !important;
+        }
+        .total_box{
+            border: 1px solid black !important;
+            border-top: none !important;
+            border-right: none !important;
+            padding: 2px !important;
+            text-align: right !important;
+        }
+    }
+     table[name="invoice_line_table"]{
+        border: 1px solid #374151 !important;
+        border-top: 1px solid transparent !important;
+        border-left: 1px solid transparent !important;
+        th{
+            border-top: 1px solid #374151 !important;
+            border-left: 1px solid #374151 !important;
+        }
+        td[name="account_invoice_line_name"]{
+            border-left: 1px solid #374151 !important;
+        }
+    }
+    table[name="sale_line_table"]{
+        border: 1px solid #374151 !important;
+        border-top: 1px solid transparent !important;
+        border-left: 1px solid transparent !important;
+        th{
+            border-top: 1px solid #374151 !important;
+            border-left: 1px solid #374151 !important;
+        }
+        td[name="td_name"]{
+            border-left: 1px solid #374151 !important;
+        }
+    }
+}

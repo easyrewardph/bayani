@@ -185,8 +185,13 @@
             </xpath>
             <xpath expr="//t[@t-foreach='lines']" position="after">
                 <tr>
-                    <td colspan="2"></td>
-                    <td><span>Total Box: = </span><span t-esc="sum(lines.mapped('quantity'))"/> </td>
+                    <td colspan="2" class="empty_space"></td>
+                    <td class="empty_space_box">
+                        <div class="total_box">
+                            <span>Total Box: = </span><span t-esc="sum(lines.mapped('quantity'))"/>
+                        </div>
+
+                    </td>
                     <td t-att-colspan="5 if display_discount else 4" style="padding: 0; border: none;">
                     <style>
                         .no-border-table,
@@ -329,6 +334,10 @@
 
         <!--        SALE ORDER-->
         <template id="report_saleorder_document_custom" inherit_id="sale.report_saleorder_document">
+            <xpath expr="//table" position="attributes">
+                <attribute name="name">sale_line_table</attribute>
+<!--                <field attribute="add">sale_line_table</field>-->
+            </xpath>
             <xpath expr="//t[@t-set='address']" position="replace">
                  <t t-set="address">
                      <t t-if="doc.partner_shipping_id == doc.partner_invoice_id == doc.partner_id">
@@ -556,8 +565,12 @@
 <!--            </xpath>-->
             <xpath expr="//t[@t-foreach='lines_to_report']" position="after">
                 <tr>
-                    <td colspan="2"></td>
-                    <td><span>Total Box: = </span><span t-esc="sum(lines_to_report.mapped('product_uom_qty'))"/> </td>
+                    <td colspan="2" class="empty_space"></td>
+                    <td class="empty_space_box">
+                        <div class="total_box">
+                            <span>Total Box: = </span><span t-esc="sum(lines_to_report.mapped('product_uom_qty'))"/>
+                        </div>
+                    </td>
                     <td t-att-colspan="5 if display_discount else 4" style="padding: 0; border: none;">
                     <style>
                         .no-border-table,
