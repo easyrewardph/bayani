@@ -62,7 +62,7 @@
 <!--                </td>-->
 <!--            </xpath>-->
             <xpath expr="//thead" position="replace">
-                <thead style="display: table-row-group">
+                <thead>
                     <tr>
                         <th name="th_description" class="text-start"><span>Description</span></th>
                         <th name="th_expiry_date" class="text-end text-nowrap">Expiry Date</th>
@@ -184,15 +184,23 @@
 
             </xpath>
             <xpath expr="//t[@t-foreach='lines']" position="after">
-                <tr>
-                    <td colspan="2" class="empty_space"></td>
+                <tr class="amount_total_space_box">
+                    <td colspan="2" class="empty_space">
+                        <p class="mx-auto" style="page-break-inside: avoid;">
+                            Received by:                 <br/>
+                            Name:                        <br/>
+                            Sign:                        <br/>
+                            Date:                        <br/>
+                            "I/We acknowledge full receipt of the goods described in this copy of our customer invoice and agree to abide by the terms and conditions of supply by Bayani Imports Pty Ltd on website (https://bayani.com.au/terms)."
+                        </p>
+                    </td>
                     <td class="empty_space_box">
                         <div class="total_box">
                             <span>Total Box: = </span><span t-esc="sum(lines.mapped('quantity'))"/>
                         </div>
 
                     </td>
-                    <td t-att-colspan="5 if display_discount else 4" style="padding: 0; border: none;">
+                    <td t-att-colspan="5 if display_discount else 4" style="padding: 0; border: none;" class="amount_total_space_box">
                     <style>
                         .no-border-table,
                         .no-border-table td,
@@ -210,9 +218,10 @@
                         .no-border-table td {
                             padding: 6px 10px !important; /* top-bottom, left-right */
                         }
+
                     </style>
 
-                    <table class="no-border-table">
+                    <table class="no-border-table" style="border:1px solid black !important;border-top:1px solid transparent !important;">
                         <t t-if="o.tax_totals">
                             <t t-set="tax_totals" t-value="o.tax_totals"/>
                             <t t-set="currency" t-value="o.currency_id"/>
@@ -303,16 +312,17 @@
 <!--                </td>-->
 <!--            </xpath>-->
 
-            <xpath expr="//div[@id='payment_term']" position="replace">
-<!--                <h1></h1>-->
-                <p class="mx-auto" style="page-break-inside: avoid;">
-                    Received by:                 <br/>
-                    Name:                        <br/>
-                    Sign:                        <br/>
-                    Date:                        <br/>
-                    "I/We acknowledge full receipt of the goods described in this copy of our customer invoice and agree to abide by the terms and conditions of supply by Bayani Imports Pty Ltd on website (https://bayani.com.au/terms)."
-                </p>
-            </xpath>
+            <xpath expr="//div[@id='payment_term']" position="replace"/>
+<!--            <xpath expr="//div[@id='payment_term']" position="replace">-->
+<!--&lt;!&ndash;                <h1></h1>&ndash;&gt;-->
+<!--                <p class="mx-auto" style="page-break-inside: avoid;">-->
+<!--                    Received by:                 <br/>-->
+<!--                    Name:                        <br/>-->
+<!--                    Sign:                        <br/>-->
+<!--                    Date:                        <br/>-->
+<!--                    "I/We acknowledge full receipt of the goods described in this copy of our customer invoice and agree to abide by the terms and conditions of supply by Bayani Imports Pty Ltd on website (https://bayani.com.au/terms)."-->
+<!--                </p>-->
+<!--            </xpath>-->
         </template>
         <template id="account_report_invoice_document_custom" inherit_id="account_accountant.report_invoice_document">
             <xpath expr="//div[@t-if='o.show_signature_area']" position="replace">
@@ -564,14 +574,14 @@
 <!--                </div>-->
 <!--            </xpath>-->
             <xpath expr="//t[@t-foreach='lines_to_report']" position="after">
-                <tr>
+                <tr class="amount_total_space_box">
                     <td colspan="2" class="empty_space"></td>
                     <td class="empty_space_box">
                         <div class="total_box">
                             <span>Total Box: = </span><span t-esc="sum(lines_to_report.mapped('product_uom_qty'))"/>
                         </div>
                     </td>
-                    <td t-att-colspan="5 if display_discount else 4" style="padding: 0; border: none;">
+                    <td t-att-colspan="5 if display_discount else 4" style="padding: 0; border: none;" class="amount_total_space_box">
                     <style>
                         .no-border-table,
                         .no-border-table td,
@@ -591,7 +601,7 @@
                         }
                     </style>
 
-                    <table class="no-border-table">
+                    <table class="no-border-table" style="border:1px solid black !important;border-top:1px solid transparent !important;">
                         <t t-if="doc.tax_totals">
                             <t t-set="tax_totals" t-value="doc.tax_totals"/>
                             <t t-set="currency" t-value="doc.currency_id"/>
@@ -657,30 +667,30 @@
             </xpath>
             <xpath expr="//div[@name='total']" position="replace">
                 <div id="total" class="row mt-n3" name="total">
-                    <div class="col-6" style="margin-top:12px;page-break-inside: avoid;">
-                        <p class="mx-auto" style="page-break-inside: avoid;">
-                            Received by:
-                            <br/>
-                            Name:
-                            <br/>
-                            Sign:
-                            <br/>
-                            Date:
-                            <br/>
-                            "I/We acknowledge full receipt of the goods described in this copy of our customer invoice
-                            and agree to abide by the terms and conditions of supply by Bayani Imports Pty Ltd on
-                            website (https://bayani.com.au/terms)."
-                        </p>
-                    </div>
-                    <div t-attf-class="#{'col-6' if report_type != 'html' else 'col-sm-7 col-md-6'}">
-<!--                        <table class="o_total_table table table-borderless">-->
-<!--                            &lt;!&ndash; Tax totals &ndash;&gt;-->
-<!--                            <t t-call="sale.document_tax_totals">-->
-<!--                                <t t-set="tax_totals" t-value="doc.tax_totals"/>-->
-<!--                                <t t-set="currency" t-value="doc.currency_id"/>-->
-<!--                            </t>-->
-<!--                        </table>-->
-                    </div>
+<!--                    <div class="col-6" style="margin-top:12px;page-break-inside: avoid;">-->
+<!--                        <p class="mx-auto" style="page-break-inside: avoid;">-->
+<!--                            Received by:-->
+<!--                            <br/>-->
+<!--                            Name:-->
+<!--                            <br/>-->
+<!--                            Sign:-->
+<!--                            <br/>-->
+<!--                            Date:-->
+<!--                            <br/>-->
+<!--                            "I/We acknowledge full receipt of the goods described in this copy of our customer invoice-->
+<!--                            and agree to abide by the terms and conditions of supply by Bayani Imports Pty Ltd on-->
+<!--                            website (https://bayani.com.au/terms)."-->
+<!--                        </p>-->
+<!--                    </div>-->
+<!--                    <div t-attf-class="#{'col-6' if report_type != 'html' else 'col-sm-7 col-md-6'}">-->
+<!--&lt;!&ndash;                        <table class="o_total_table table table-borderless">&ndash;&gt;-->
+<!--&lt;!&ndash;                            &lt;!&ndash; Tax totals &ndash;&gt;&ndash;&gt;-->
+<!--&lt;!&ndash;                            <t t-call="sale.document_tax_totals">&ndash;&gt;-->
+<!--&lt;!&ndash;                                <t t-set="tax_totals" t-value="doc.tax_totals"/>&ndash;&gt;-->
+<!--&lt;!&ndash;                                <t t-set="currency" t-value="doc.currency_id"/>&ndash;&gt;-->
+<!--&lt;!&ndash;                            </t>&ndash;&gt;-->
+<!--&lt;!&ndash;                        </table>&ndash;&gt;-->
+<!--                    </div>-->
                 </div>
 
             </xpath>

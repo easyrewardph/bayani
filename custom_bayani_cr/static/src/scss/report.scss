@@ -18,7 +18,7 @@
         }
         .empty_space_box{
             border: 1px solid transparent !important;
-            border-right: 1px solid #374151 !important;
+//             border-right: 1px solid #374151 !important;
             border-left: none !important;
             padding: 0 !important;
         }
@@ -29,6 +29,7 @@
             padding: 2px !important;
             text-align: right !important;
         }
+
     }
      table[name="invoice_line_table"]{
         border: 1px solid #374151 !important;
@@ -54,4 +55,10 @@
             border-left: 1px solid #374151 !important;
         }
     }
+}
+
+.amount_total_space_box{
+//     border-left: none !important;
+//     border-bottom: none !important;
+    border: 1px solid transparent !important;
 }
