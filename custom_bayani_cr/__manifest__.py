@@ -17,7 +17,7 @@
         'views/website_page.xml',
         'views/website_thankyou_page.xml',
         'views/website_menu.xml',
-        'views/report_layout_extend.xml',
+        # 'views/report_layout_extend.xml',
         'views/report_extend.xml',
     ],
     'assets': {
@@ -26,7 +26,7 @@
             'custom_bayani_cr/static/src/js/custom_qty_selection.js',
         ],
         'web.report_assets_common': [
-            'custom_bayani_cr/static/src/scss/report.scss',
+            'custom_bayani_cr/static/src/web_client/layout_boxed.scss',
         ],
     },
     'license': 'LGPL-3',

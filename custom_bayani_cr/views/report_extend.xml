@@ -40,41 +40,58 @@
                 <div class="offset-col-6 col-6" name="address_same_as_shipping">
                     <t t-set="address">
                         <strong>Deliver To:</strong>
-                        <address class="mb-0" t-field="o.partner_id" t-options="{&quot;widget&quot;: &quot;contact&quot;, &quot;fields&quot;: [&quot;address&quot;, &quot;name&quot;], &quot;no_marker&quot;: True}"/>
+                        <address class="mb-0" t-field="o.partner_id"
+                                 t-options="{&quot;widget&quot;: &quot;contact&quot;, &quot;fields&quot;: [&quot;address&quot;, &quot;name&quot;], &quot;no_marker&quot;: True}"/>
                         <div t-if="o.partner_id.vat" id="partner_vat_address_same_as_shipping">
-                            <t t-if="o.company_id.account_fiscal_country_id.vat_label" t-out="o.company_id.account_fiscal_country_id.vat_label" id="inv_tax_id_label"/>
-                            <t t-else="">Tax ID</t>: <span t-field="o.partner_id.vat"/>
+                            <t t-if="o.company_id.account_fiscal_country_id.vat_label"
+                               t-out="o.company_id.account_fiscal_country_id.vat_label" id="inv_tax_id_label"/>
+                            <t t-else="">Tax ID</t>:
+                            <span t-field="o.partner_id.vat"/>
                         </div>
                     </t>
                 </div>
             </xpath>
             <!--            PRODUCT LINES-->
-<!--            <xpath expr="//td[@name='account_invoice_line_name']" position="replace">-->
-<!--                <td name="account_invoice_line_name">-->
-<!--                    <t t-if="counter > 0">-->
-<!--                        <span t-if="line.name" t-field="line.name" t-options="{'widget': 'text'}"-->
-<!--                              style="font-size:12px;">Bacon Burger-->
-<!--                        </span>-->
-<!--                    </t>-->
-<!--                    <t t-else="">-->
-<!--                        <span t-if="line.name" t-field="line.name" t-options="{'widget': 'text'}">Bacon Burger</span>-->
-<!--                    </t>-->
-<!--                </td>-->
-<!--            </xpath>-->
+            <!--            <xpath expr="//td[@name='account_invoice_line_name']" position="replace">-->
+            <!--                <td name="account_invoice_line_name">-->
+            <!--                    <t t-if="counter > 0">-->
+            <!--                        <span t-if="line.name" t-field="line.name" t-options="{'widget': 'text'}"-->
+            <!--                              style="font-size:12px;">Bacon Burger-->
+            <!--                        </span>-->
+            <!--                    </t>-->
+            <!--                    <t t-else="">-->
+            <!--                        <span t-if="line.name" t-field="line.name" t-options="{'widget': 'text'}">Bacon Burger</span>-->
+            <!--                    </t>-->
+            <!--                </td>-->
+            <!--            </xpath>-->
             <xpath expr="//thead" position="replace">
                 <thead>
                     <tr>
-                        <th name="th_description" class="text-start"><span>Description</span></th>
+                        <th name="th_description" class="text-start">
+                            <span>Description</span>
+                        </th>
                         <th name="th_expiry_date" class="text-end text-nowrap">Expiry Date</th>
-                        <th name="th_quantity" class="text-end"><span>Quantity</span></th>
-                        <th name="th_priceunit" t-attf-class="text-end text-nowrap {{ 'd-none d-md-table-cell' if report_type == 'html' else '' }}"><span>Unit Price</span></th>
-                        <th name="th_box_price" class="text-end text-nowrap">Box Price</th>
-                        <th name="th_discount" t-if="display_discount" t-attf-class="text-end {{ 'd-none d-md-table-cell' if report_type == 'html' else '' }}">
+                        <th name="th_quantity" class="text-end">
+                            <span>Quantity</span>
+                        </th>
+                        <th name="th_priceunit"
+                            t-attf-class="text-end text-nowrap {{ 'd-none d-md-table-cell' if report_type == 'html' else '' }}">
+                            <span>Unit Price ex GST</span>
+                        </th>
+                        <th name="th_box_price" class="text-end text-nowrap">Box Price ex GST</th>
+                        <th name="th_discount" t-if="display_discount"
+                            t-attf-class="text-end {{ 'd-none d-md-table-cell' if report_type == 'html' else '' }}">
                             <span>Disc.%</span>
                         </th>
-                        <th name="th_taxes" t-attf-class="text-end {{ 'd-none d-md-table-cell' if report_type == 'html' else '' }}"><span>Taxes</span></th>
+                        <th name="th_total_ex_gst">
+                            <span>Total ex GST</span>
+                        </th>
+                        <th name="th_taxes"
+                            t-attf-class="text-end {{ 'd-none d-md-table-cell' if report_type == 'html' else '' }}">
+                            <span>GST</span>
+                        </th>
                         <th name="th_subtotal" class="text-end">
-                            <span>Amount</span>
+                            <span>Total</span>
                         </th>
                     </tr>
                 </thead>
@@ -82,21 +99,22 @@
             <xpath expr="//t[@t-foreach='lines']/tr[1]" position="replace">
                 <tr t-att-class="'fw-bold o_line_section' if line.display_type == 'line_section' else 'fst-italic o_line_note' if line.display_type == 'line_note' else ''">
                     <t t-if="line.display_type == 'product'" name="account_invoice_line_accountable">
-                        <td name="account_invoice_line_name">
+                        <td name="account_invoice_line_name" style="font-size:15px;">
                             <t t-if="counter > 0">
                                 <span t-if="line.name" t-field="line.name" t-options="{'widget': 'text'}"
                                       style="font-size:12px;">Bacon Burger
                                 </span>
                             </t>
                             <t t-else="">
-                                <span t-if="line.name" t-field="line.name" t-options="{'widget': 'text'}">Bacon Burger</span>
+                                <span t-if="line.name" t-field="line.name" t-options="{'widget': 'text'}">Bacon Burger
+                                </span>
                             </t>
                         </td>
                         <t t-set="exp" t-value="line.get_expiry_date()"/>
-    <!--                    style="font-size:12px;" -->
+                        <!--                    style="font-size:12px;" -->
                         <td name="td_expiry_date" class="text-end">
                             <t t-if="counter > 0">
-                                <span t-esc="exp" style="font-size:12px;" t-options='{"widget": "date"}'> -</span>
+                                <span t-esc="exp" style="font-size:12px;" t-options='{"widget": "date"}'>-</span>
                             </t>
                             <t t-else="">
                                 <span t-esc="exp" t-options='{"widget": "date"}'>-</span>
@@ -105,16 +123,21 @@
                         <td name="td_quantity" class="text-end text-nowrap">
                             <t t-if="counter > 0">
                                 <span t-field="line.quantity" style="font-size:12px;">3.00</span>
-                                <span t-field="line.product_uom_id" groups="uom.group_uom" style="font-size:12px;">units</span>
+                                <span t-field="line.product_uom_id" groups="uom.group_uom" style="font-size:12px;">
+                                    units
+                                </span>
                             </t>
                             <t t-else="">
                                 <span t-field="line.quantity">3.00</span>
                                 <span t-field="line.product_uom_id" groups="uom.group_uom">units</span>
                             </t>
                         </td>
-                        <td name="td_price_unit" t-attf-class="text-end {{ 'd-none d-md-table-cell' if report_type == 'html' else '' }}">
+                        <td name="td_price_unit"
+                            t-attf-class="text-end {{ 'd-none d-md-table-cell' if report_type == 'html' else '' }}">
                             <t t-if="counter > 0">
-                                <span class="text-nowrap" t-field="line.product_id.base_unit_price" style="font-size:12px;">9.00</span>
+                                <span class="text-nowrap" t-field="line.product_id.base_unit_price"
+                                      style="font-size:12px;">9.00
+                                </span>
                             </t>
                             <t t-else="">
                                 <span class="text-nowrap" t-field="line.product_id.base_unit_price">9.00</span>
@@ -129,7 +152,13 @@
                                 <span class="text-nowrap" t-field="line.price_unit">9.00</span>
                             </t>
                         </td>
-                        <td name="td_discount" t-if="display_discount" t-attf-class="text-end {{ 'd-none d-md-table-cell' if report_type == 'html' else '' }}">
+                        <td name="th_total_ex_gst" t-attf-class="text-end">
+                            <!--                            <t t-else="">-->
+                            <span class="text-nowrap" t-field="line.price_subtotal" style="font-size:15px;">0</span>
+                            <!--                            </t>-->
+                        </td>
+                        <td name="td_discount" t-if="display_discount"
+                            t-attf-class="text-end {{ 'd-none d-md-table-cell' if report_type == 'html' else '' }}">
                             <t t-if="counter > 0">
                                 <span class="text-nowrap" t-field="line.discount" style="font-size:12px;">0</span>
                             </t>
@@ -137,19 +166,19 @@
                                 <span class="text-nowrap" t-field="line.discount">0</span>
                             </t>
                         </td>
-                        <t t-set="taxes" t-value="', '.join([(tax.invoice_label or tax.name) for tax in line.tax_ids])"/>
-                        <td name="td_taxes" t-attf-class="text-end {{ 'd-none d-md-table-cell' if report_type == 'html' else '' }} {{ 'text-nowrap' if len(taxes) &lt; 10 else '' }}">
-                            <t t-if="counter > 0">
-                                <span t-out="taxes" id="line_tax_ids" style="font-size:12px;">Tax 15%</span>
-                            </t>
-                            <t t-else="">
-                                <span t-out="taxes" id="line_tax_ids">Tax 15%</span>
-                            </t>
+                        <!--                        <t t-set="taxes"-->
+                        <!--                           t-value="', '.join([(tax.invoice_label or tax.name) for tax in line.tax_ids])"/>-->
+                        <td name="td_taxes">
+                            <span t-esc="line.price_total - line.price_subtotal"
+                                  t-options="{'widget': 'monetary', 'display_currency': line.currency_id}"
+                                  style="font-size:15px;"/>
+                            <!--                                <span style="font-size:12px;" t-out="line.price_total- line.price_subtotal" t-options="{'widget': 'monetary', 'display_currency': line.currency_id}" >Tax 15%</span>-->
 
                         </td>
                         <td name="td_subtotal" class="text-end o_price_total">
                             <t t-if="counter > 0">
-                                <span class="text-nowrap" t-field="line.price_total" style="font-size:12px;">27.00</span>
+                                <span class="text-nowrap" t-field="line.price_total" style="font-size:12px;">27.00
+                                </span>
                             </t>
                             <t t-else="">
                                 <span class="text-nowrap" t-field="line.price_total">27.00</span>
@@ -160,7 +189,9 @@
                     <t t-elif="line.display_type == 'line_section'">
                         <td colspan="99">
                             <t t-if="counter > 0">
-                                <span t-field="line.name" t-options="{'widget': 'text'}" style="font-size:12px;">A section title</span>
+                                <span t-field="line.name" t-options="{'widget': 'text'}" style="font-size:12px;">A
+                                    section title
+                                </span>
                             </t>
                             <t t-else="">
                                 <span t-field="line.name" t-options="{'widget': 'text'}">A section title</span>
@@ -173,10 +204,14 @@
                     <t t-elif="line.display_type == 'line_note'">
                         <td colspan="99">
                             <t t-if="counter > 0">
-                                <span t-field="line.name" t-options="{'widget': 'text'}" style="font-size:12px;">A note, whose content usually applies to the section or product above.</span>
+                                <span t-field="line.name" t-options="{'widget': 'text'}" style="font-size:12px;">A note,
+                                    whose content usually applies to the section or product above.
+                                </span>
                             </t>
                             <t t-else="">
-                                <span t-field="line.name" t-options="{'widget': 'text'}">A note, whose content usually applies to the section or product above.</span>
+                                <span t-field="line.name" t-options="{'widget': 'text'}">A note, whose content usually
+                                    applies to the section or product above.
+                                </span>
                             </t>
                         </td>
                     </t>
@@ -187,157 +222,183 @@
                 <tr class="amount_total_space_box">
                     <td colspan="2" class="empty_space">
                         <p class="mx-auto" style="page-break-inside: avoid;">
-                            Received by:                 <br/>
-                            Name:                        <br/>
-                            Sign:                        <br/>
-                            Date:                        <br/>
-                            "I/We acknowledge full receipt of the goods described in this copy of our customer invoice and agree to abide by the terms and conditions of supply by Bayani Imports Pty Ltd on website (https://bayani.com.au/terms)."
+                            Received by:
+                            <br/>
+                            Name:
+                            <br/>
+                            Sign:
+                            <br/>
+                            Date:
+                            <br/>
+                            "I/We acknowledge full receipt of the goods described in this copy of our customer invoice
+                            and agree to abide by the terms and conditions of supply by Bayani Imports Pty Ltd on
+                            website (https://bayani.com.au/terms)."
                         </p>
                     </td>
                     <td class="empty_space_box">
                         <div class="total_box">
-                            <span>Total Box: = </span><span t-esc="sum(lines.mapped('quantity'))"/>
+                            <span>Total Box: =</span>
+                            <span t-esc="sum(lines.mapped('quantity'))"/>
                         </div>
 
                     </td>
-                    <td t-att-colspan="5 if display_discount else 4" style="padding: 0; border: none;" class="amount_total_space_box">
-                    <style>
-                        .no-border-table,
-                        .no-border-table td,
-                        .no-border-table th,
-                        .no-border-table tr {
+                    <td t-att-colspan="5 if display_discount else 4" style="padding: 0; border: none;"
+                        class="amount_total_space_box">
+                        <style>
+                            .no-border-table,
+                            .no-border-table td,
+                            .no-border-table th,
+                            .no-border-table tr {
                             border: none !important;
                             outline: none !important;
                             box-shadow: none !important;
-                        }
+                            }
 
-                        .no-border-table {
+                            .no-border-table {
                             border-collapse: collapse !important;
                             width: 100%;
-                        }
-                        .no-border-table td {
+                            }
+                            .no-border-table td {
                             padding: 6px 10px !important; /* top-bottom, left-right */
-                        }
+                            }
 
-                    </style>
+                        </style>
 
-                    <table class="no-border-table" style="border:1px solid black !important;border-top:1px solid transparent !important;">
-                        <t t-if="o.tax_totals">
-                            <t t-set="tax_totals" t-value="o.tax_totals"/>
-                            <t t-set="currency" t-value="o.currency_id"/>
-                            <t t-set="same_tax_base" t-value="tax_totals['same_tax_base']"/>
-                            <t t-foreach="tax_totals['subtotals']" t-as="subtotal">
-                                <tr class="o_subtotal">
-                                    <td>
-                                        <span t-out="subtotal['name']"/>
-                                    </td>
+                        <table class="no-border-table"
+                               style="border:1px solid black !important;border-top:1px solid transparent !important;">
+                            <t t-if="o.tax_totals">
+                                <t t-set="tax_totals" t-value="o.tax_totals"/>
+                                <t t-set="currency" t-value="o.currency_id"/>
+                                <t t-set="same_tax_base" t-value="tax_totals['same_tax_base']"/>
+                                <t t-foreach="tax_totals['subtotals']" t-as="subtotal">
+                                    <tr class="o_subtotal">
+                                        <td>
+                                            <span t-out="subtotal['name']"/>
+                                        </td>
+                                        <td class="text-end">
+                                            <span t-out="subtotal['base_amount_currency']"
+                                                  t-options="{'widget': 'monetary', 'display_currency': currency}"/>
+                                        </td>
+                                    </tr>
+                                    <t t-foreach="subtotal['tax_groups']" t-as="tax_group">
+                                        <tr class="o_taxes">
+                                            <t t-if="same_tax_base or tax_group['display_base_amount_currency'] is None">
+                                                <td>
+                                                    <span class="text-nowrap" t-out="tax_group['group_name']"/>
+                                                </td>
+                                                <td class="text-end">
+                                                    <span class="text-nowrap"
+                                                          t-out="tax_group['tax_amount_currency']"
+                                                          t-options="{'widget': 'monetary', 'display_currency': currency}"/>
+                                                </td>
+                                            </t>
+                                            <t t-else="">
+                                                <td>
+                                                    <span t-out="tax_group['group_name']"/>
+                                                    on
+                                                    <span class="text-nowrap"
+                                                          t-out="tax_group['display_base_amount_currency']"
+                                                          t-options="{'widget': 'monetary', 'display_currency': currency}"/>
+                                                </td>
+                                                <td class="text-end">
+                                                    <span class="text-nowrap"
+                                                          t-out="tax_group['tax_amount_currency']"
+                                                          t-options="{'widget': 'monetary', 'display_currency': currency}"/>
+                                                </td>
+                                            </t>
+                                        </tr>
+                                    </t>
+                                </t>
+
+                                <tr t-if="'cash_rounding_base_amount_currency' in tax_totals">
+                                    <td>Rounding</td>
                                     <td class="text-end">
-                                        <span t-out="subtotal['base_amount_currency']"
+                                        <span t-out="tax_totals['cash_rounding_base_amount_currency']"
                                               t-options="{'widget': 'monetary', 'display_currency': currency}"/>
                                     </td>
                                 </tr>
-                                <t t-foreach="subtotal['tax_groups']" t-as="tax_group">
-                                    <tr class="o_taxes">
-                                        <t t-if="same_tax_base or tax_group['display_base_amount_currency'] is None">
-                                            <td>
-                                                <span class="text-nowrap" t-out="tax_group['group_name']"/>
-                                            </td>
-                                            <td class="text-end">
-                                                <span class="text-nowrap"
-                                                      t-out="tax_group['tax_amount_currency']"
-                                                      t-options="{'widget': 'monetary', 'display_currency': currency}"/>
-                                            </td>
-                                        </t>
-                                        <t t-else="">
-                                            <td>
-                                                <span t-out="tax_group['group_name']"/> on
-                                                <span class="text-nowrap"
-                                                      t-out="tax_group['display_base_amount_currency']"
-                                                      t-options="{'widget': 'monetary', 'display_currency': currency}"/>
-                                            </td>
-                                            <td class="text-end">
-                                                <span class="text-nowrap"
-                                                      t-out="tax_group['tax_amount_currency']"
-                                                      t-options="{'widget': 'monetary', 'display_currency': currency}"/>
-                                            </td>
-                                        </t>
-                                    </tr>
-                                </t>
+
+                                <tr style="background-color:#dc3545;color:white !important;">
+                                    <td>
+                                        <strong>Total</strong>
+                                    </td>
+                                    <td class="text-end">
+                                        <strong t-out="tax_totals['total_amount_currency']"
+                                                t-options="{'widget': 'monetary', 'display_currency': currency}"/>
+                                    </td>
+                                </tr>
                             </t>
+                        </table>
+                        <div style="margin-left:10px;">
+                            <u>
+                                <i>Payment Details:</i>
+                            </u>
+                            <br/>
+                            Account Name: Bayani Imports Pty Ltd
+                            <br/>
+                            BSB: 032 382 
+                            <br/>
+                            Please send remittance advice to bayani.imports@gmail.com
+                        </div>
 
-                            <tr t-if="'cash_rounding_base_amount_currency' in tax_totals">
-                                <td>Rounding</td>
-                                <td class="text-end">
-                                    <span t-out="tax_totals['cash_rounding_base_amount_currency']"
-                                          t-options="{'widget': 'monetary', 'display_currency': currency}"/>
-                                </td>
-                            </tr>
-
-                            <tr style="background-color:#dc3545;color:white !important;">
-                                <td><strong>Total</strong></td>
-                                <td class="text-end">
-                                    <strong t-out="tax_totals['total_amount_currency']"
-                                            t-options="{'widget': 'monetary', 'display_currency': currency}"/>
-                                </td>
-                            </tr>
-                        </t>
-                    </table>
                     </td>
                 </tr>
             </xpath>
             <xpath expr="//div[@id='total']" position="replace"/>
 
 
-<!--            <xpath expr="//thead/tr/th[@name='th_taxes']" position="before">-->
-<!--                <th name="th_expiry_date" class="text-end text-nowrap">Expiry Date</th>-->
-<!--            </xpath>-->
-<!--            <xpath expr="//td[@name='td_taxes']" position="before">-->
-<!--                <t t-set="exp" t-value="line.get_expiry_date()"/>-->
-<!--                <td name="td_expiry_date" class="text-end">-->
-<!--                    <span t-esc="exp">-</span>-->
-<!--                </td>-->
-<!--            </xpath>-->
-<!--            <xpath expr="//thead/tr/th[@name='th_priceunit']" position="before">-->
-<!--                <th name="th_box_price" class="text-end text-nowrap">Box Price</th>-->
-<!--            </xpath>-->
-<!--            <xpath expr="//td[@name='td_price_unit']" position="before">-->
-<!--                <t t-set="t" t-value="round(line.price_unit * line.quantity,2)"/>-->
-<!--                <td name="td_box_price" t-attf-class="text-end">-->
-<!--                    <span class="text-nowrap" t-esc="t">9.00</span>-->
-<!--                </td>-->
-<!--            </xpath>-->
-<!--            <xpath expr="//td[@name='td_price_unit']" position="replace">-->
-<!--                <td name="td_price_unit" t-attf-class="text-end {{ 'd-none d-md-table-cell' if report_type == 'html' else '' }}">-->
-<!--                    <span class="text-nowrap" t-field="line.product_id.base_unit_price">9.00</span>-->
-<!--                </td>-->
-<!--            </xpath>-->
+            <!--            <xpath expr="//thead/tr/th[@name='th_taxes']" position="before">-->
+            <!--                <th name="th_expiry_date" class="text-end text-nowrap">Expiry Date</th>-->
+            <!--            </xpath>-->
+            <!--            <xpath expr="//td[@name='td_taxes']" position="before">-->
+            <!--                <t t-set="exp" t-value="line.get_expiry_date()"/>-->
+            <!--                <td name="td_expiry_date" class="text-end">-->
+            <!--                    <span t-esc="exp">-</span>-->
+            <!--                </td>-->
+            <!--            </xpath>-->
+            <!--            <xpath expr="//thead/tr/th[@name='th_priceunit']" position="before">-->
+            <!--                <th name="th_box_price" class="text-end text-nowrap">Box Price</th>-->
+            <!--            </xpath>-->
+            <!--            <xpath expr="//td[@name='td_price_unit']" position="before">-->
+            <!--                <t t-set="t" t-value="round(line.price_unit * line.quantity,2)"/>-->
+            <!--                <td name="td_box_price" t-attf-class="text-end">-->
+            <!--                    <span class="text-nowrap" t-esc="t">9.00</span>-->
+            <!--                </td>-->
+            <!--            </xpath>-->
+            <!--            <xpath expr="//td[@name='td_price_unit']" position="replace">-->
+            <!--                <td name="td_price_unit" t-attf-class="text-end {{ 'd-none d-md-table-cell' if report_type == 'html' else '' }}">-->
+            <!--                    <span class="text-nowrap" t-field="line.product_id.base_unit_price">9.00</span>-->
+            <!--                </td>-->
+            <!--            </xpath>-->
 
             <xpath expr="//div[@id='payment_term']" position="replace"/>
-<!--            <xpath expr="//div[@id='payment_term']" position="replace">-->
-<!--&lt;!&ndash;                <h1></h1>&ndash;&gt;-->
-<!--                <p class="mx-auto" style="page-break-inside: avoid;">-->
-<!--                    Received by:                 <br/>-->
-<!--                    Name:                        <br/>-->
-<!--                    Sign:                        <br/>-->
-<!--                    Date:                        <br/>-->
-<!--                    "I/We acknowledge full receipt of the goods described in this copy of our customer invoice and agree to abide by the terms and conditions of supply by Bayani Imports Pty Ltd on website (https://bayani.com.au/terms)."-->
-<!--                </p>-->
-<!--            </xpath>-->
+            <!--            <xpath expr="//div[@id='payment_term']" position="replace">-->
+            <!--&lt;!&ndash;                <h1></h1>&ndash;&gt;-->
+            <!--                <p class="mx-auto" style="page-break-inside: avoid;">-->
+            <!--                    Received by:                 <br/>-->
+            <!--                    Name:                        <br/>-->
+            <!--                    Sign:                        <br/>-->
+            <!--                    Date:                        <br/>-->
+            <!--                    "I/We acknowledge full receipt of the goods described in this copy of our customer invoice and agree to abide by the terms and conditions of supply by Bayani Imports Pty Ltd on website (https://bayani.com.au/terms)."-->
+            <!--                </p>-->
+            <!--            </xpath>-->
         </template>
         <template id="account_report_invoice_document_custom" inherit_id="account_accountant.report_invoice_document">
             <xpath expr="//div[@t-if='o.show_signature_area']" position="replace">
-                    <div t-if="o.show_signature_area" t-attf-class="#{'col-12' if report_type != 'html' else 'col-lg-5 offset-lg-7 col-md-12'}">
-                        <t t-if="o.signature">
-                            <img t-if="o.signature" t-att-src="image_data_uri(o.signature)" class="img-fluid mx-auto" style="max-height: 6rem;"/>
-                        </t>
-                        <t t-else="">
-                            <!-- leave an empty space allowing to sign the invoice manually -->
-                            <div class="col-12" style="min-height: 10rem"/>
-                        </t>
-                        <!-- wkhtmltopdf doesn't render a simple `border-top border-dark` -->
-                        <p>
-                        </p>
-                    </div>
+                <div t-if="o.show_signature_area"
+                     t-attf-class="#{'col-12' if report_type != 'html' else 'col-lg-5 offset-lg-7 col-md-12'}">
+                    <t t-if="o.signature">
+                        <img t-if="o.signature" t-att-src="image_data_uri(o.signature)" class="img-fluid mx-auto"
+                             style="max-height: 6rem;"/>
+                    </t>
+                    <t t-else="">
+                        <!-- leave an empty space allowing to sign the invoice manually -->
+                        <div class="col-12" style="min-height: 10rem"/>
+                    </t>
+                    <!-- wkhtmltopdf doesn't render a simple `border-top border-dark` -->
+                    <p>
+                    </p>
+                </div>
             </xpath>
         </template>
 
@@ -346,18 +407,20 @@
         <template id="report_saleorder_document_custom" inherit_id="sale.report_saleorder_document">
             <xpath expr="//table" position="attributes">
                 <attribute name="name">sale_line_table</attribute>
-<!--                <field attribute="add">sale_line_table</field>-->
+                <!--                <field attribute="add">sale_line_table</field>-->
             </xpath>
             <xpath expr="//t[@t-set='address']" position="replace">
-                 <t t-set="address">
-                     <t t-if="doc.partner_shipping_id == doc.partner_invoice_id == doc.partner_id">
+                <t t-set="address">
+                    <t t-if="doc.partner_shipping_id == doc.partner_invoice_id == doc.partner_id">
                         <strong>Deliver To:</strong>
                     </t>
                     <div t-field="doc.partner_id"
-                        t-options='{"widget": "contact", "fields": ["address", "name"], "no_marker": True}' />
+                         t-options='{"widget": "contact", "fields": ["address", "name"], "no_marker": True}'/>
                     <p t-if="doc.partner_id.vat">
-                        <t t-if="doc.company_id.account_fiscal_country_id.vat_label" t-out="doc.company_id.account_fiscal_country_id.vat_label"/>
-                        <t t-else="">Tax ID</t>: <span t-field="doc.partner_id.vat"/>
+                        <t t-if="doc.company_id.account_fiscal_country_id.vat_label"
+                           t-out="doc.company_id.account_fiscal_country_id.vat_label"/>
+                        <t t-else="">Tax ID</t>:
+                        <span t-field="doc.partner_id.vat"/>
                     </p>
                 </t>
             </xpath>
@@ -406,7 +469,7 @@
             </xpath>
             <xpath expr="//t[@t-foreach='lines_to_report']/tr[1]" position="replace">
                 <tr
-                    t-att-class="'fw-bold o_line_section' if (
+                        t-att-class="'fw-bold o_line_section' if (
                         line.display_type == 'line_section'
                         or line.product_type == 'combo'
                     )
@@ -433,19 +496,26 @@
                             </t>
                         </td>
 
-                        <td name="td_quantity" t-attf-class="text-end {{ 'text-nowrap' if (not line.product_packaging_id or len(line.product_packaging_id.name) &lt; 10) else '' }}">
+                        <td name="td_quantity"
+                            t-attf-class="text-end {{ 'text-nowrap' if (not line.product_packaging_id or len(line.product_packaging_id.name) &lt; 10) else '' }}">
                             <t t-if="counter > 0">
                                 <span t-field="line.product_uom_qty" style="font-size:12px;">3</span>
                                 <span t-field="line.product_uom" style="font-size:12px;">units</span>
                                 <span t-if="line.product_packaging_id" style="font-size:12px;">
-                                    (<span t-field="line.product_packaging_qty" style="font-size:12px;" t-options="{&quot;widget&quot;: &quot;integer&quot;}"/> <span t-field="line.product_packaging_id" style="font-size:12px;"/>)
+                                    (
+                                    <span t-field="line.product_packaging_qty" style="font-size:12px;"
+                                          t-options="{&quot;widget&quot;: &quot;integer&quot;}"/>
+                                    <span t-field="line.product_packaging_id" style="font-size:12px;"/>)
                                 </span>
                             </t>
                             <t t-else="">
                                 <span t-field="line.product_uom_qty">3</span>
                                 <span t-field="line.product_uom">units</span>
                                 <span t-if="line.product_packaging_id">
-                                    (<span t-field="line.product_packaging_qty" t-options="{&quot;widget&quot;: &quot;integer&quot;}"/> <span t-field="line.product_packaging_id"/>)
+                                    (
+                                    <span t-field="line.product_packaging_qty"
+                                          t-options="{&quot;widget&quot;: &quot;integer&quot;}"/>
+                                    <span t-field="line.product_packaging_id"/>)
                                 </span>
                             </t>
                         </td>
@@ -511,188 +581,221 @@
                     <t t-elif="line.display_type == 'line_note'">
                         <td name="td_note_line" colspan="99">
                             <t t-if="counter > 0">
-                                <span t-field="line.name" style="font-size:12px;">A note, whose content usually applies to the section or product above.</span>
+                                <span t-field="line.name" style="font-size:12px;">A note, whose content usually applies
+                                    to the section or product above.
+                                </span>
                             </t>
                             <t t-else="">
-                                <span t-field="line.name">A note, whose content usually applies to the section or product above.</span>
+                                <span t-field="line.name">A note, whose content usually applies to the section or
+                                    product above.
+                                </span>
                             </t>
                         </td>
                     </t>
                 </tr>
             </xpath>
-<!--            <xpath expr="//td[@name='td_name']" position="replace">-->
-<!--                <td name="td_name">-->
-<!--                    <t t-if="counter > 0">-->
-<!--                        <span t-field="line.name" style="font-size:12px;">Bacon Burger</span>-->
-<!--                    </t>-->
-<!--                    <t t-else="">-->
-<!--                        <span t-field="line.name">Bacon Burger</span>-->
-<!--                    </t>-->
-<!--                </td>-->
-<!--            </xpath>-->
-<!--            <xpath expr="//thead/tr/th[@name='th_taxes']" position="before">-->
-<!--                <th name="th_expiry_date" class="text-end text-nowrap">Expiry Date</th>-->
-<!--            </xpath>-->
-<!--            <xpath expr="//td[@name='td_taxes']" position="before">-->
-<!--                <t t-set="exp" t-value="line.get_saleline_expiry_date()"/>-->
-<!--                <td name="td_expiry_date" class="text-end">-->
-<!--                    <span t-esc="exp">-</span>-->
-<!--                </td>-->
-<!--            </xpath>-->
-<!--            <xpath expr="//thead/tr/th[@name='th_priceunit']" position="before">-->
-<!--                <th name="th_box_price" class="text-end text-nowrap">Box Price</th>-->
-<!--            </xpath>-->
-<!--            <xpath expr="//td[@name='td_priceunit']" position="before">-->
-<!--                <t t-set="t" t-value="round(line.price_unit * line.product_uom_qty,2)"/>-->
-<!--                <td name="td_box_price" t-attf-class="text-end">-->
-<!--                    <span class="text-nowrap" t-esc="t">9.00</span>-->
-<!--                </td>-->
-<!--            </xpath>-->
-<!--            <xpath expr="//td[@name='td_priceunit']" position="replace">-->
-<!--                <td name="td_priceunit" class="text-end text-nowrap">-->
-<!--                    <span t-field="line.product_id.base_unit_price">3</span>-->
-<!--                </td>-->
-<!--            </xpath>-->
+            <!--            <xpath expr="//td[@name='td_name']" position="replace">-->
+            <!--                <td name="td_name">-->
+            <!--                    <t t-if="counter > 0">-->
+            <!--                        <span t-field="line.name" style="font-size:12px;">Bacon Burger</span>-->
+            <!--                    </t>-->
+            <!--                    <t t-else="">-->
+            <!--                        <span t-field="line.name">Bacon Burger</span>-->
+            <!--                    </t>-->
+            <!--                </td>-->
+            <!--            </xpath>-->
+            <!--            <xpath expr="//thead/tr/th[@name='th_taxes']" position="before">-->
+            <!--                <th name="th_expiry_date" class="text-end text-nowrap">Expiry Date</th>-->
+            <!--            </xpath>-->
+            <!--            <xpath expr="//td[@name='td_taxes']" position="before">-->
+            <!--                <t t-set="exp" t-value="line.get_saleline_expiry_date()"/>-->
+            <!--                <td name="td_expiry_date" class="text-end">-->
+            <!--                    <span t-esc="exp">-</span>-->
+            <!--                </td>-->
+            <!--            </xpath>-->
+            <!--            <xpath expr="//thead/tr/th[@name='th_priceunit']" position="before">-->
+            <!--                <th name="th_box_price" class="text-end text-nowrap">Box Price</th>-->
+            <!--            </xpath>-->
+            <!--            <xpath expr="//td[@name='td_priceunit']" position="before">-->
+            <!--                <t t-set="t" t-value="round(line.price_unit * line.product_uom_qty,2)"/>-->
+            <!--                <td name="td_box_price" t-attf-class="text-end">-->
+            <!--                    <span class="text-nowrap" t-esc="t">9.00</span>-->
+            <!--                </td>-->
+            <!--            </xpath>-->
+            <!--            <xpath expr="//td[@name='td_priceunit']" position="replace">-->
+            <!--                <td name="td_priceunit" class="text-end text-nowrap">-->
+            <!--                    <span t-field="line.product_id.base_unit_price">3</span>-->
+            <!--                </td>-->
+            <!--            </xpath>-->
             <xpath expr="//span[@name='order_note']" position="replace"/>
-<!--            <xpath expr="//div[@name='signature']" position="after">-->
-<!--                <div class="clearfix">-->
-<!--                    <div t-attf-class="#{'col-6' if report_type != 'html' else 'col-12 col-md-5'} ms-6 mt-2 d-inline-block float-end">-->
-<!--                        <p class="mx-auto" style="border-top: thin solid;page-break-inside: avoid;">-->
-<!--                            Received by:-->
-<!--                            <br/>-->
-<!--                            Name:-->
-<!--                            <br/>-->
-<!--                            Sign:-->
-<!--                            <br/>-->
-<!--                            Date:-->
-<!--                            <br/>-->
-<!--                            "I/We acknowledge full receipt of the goods described in this copy of our customer invoice-->
-<!--                            and agree to abide by the terms and conditions of supply by Bayani Imports Pty Ltd on-->
-<!--                            website (https://bayani.com.au/terms)."-->
-<!--                        </p>-->
-<!--                    </div>-->
-<!--                </div>-->
-<!--            </xpath>-->
+            <!--            <xpath expr="//div[@name='signature']" position="after">-->
+            <!--                <div class="clearfix">-->
+            <!--                    <div t-attf-class="#{'col-6' if report_type != 'html' else 'col-12 col-md-5'} ms-6 mt-2 d-inline-block float-end">-->
+            <!--                        <p class="mx-auto" style="border-top: thin solid;page-break-inside: avoid;">-->
+            <!--                            Received by:-->
+            <!--                            <br/>-->
+            <!--                            Name:-->
+            <!--                            <br/>-->
+            <!--                            Sign:-->
+            <!--                            <br/>-->
+            <!--                            Date:-->
+            <!--                            <br/>-->
+            <!--                            "I/We acknowledge full receipt of the goods described in this copy of our customer invoice-->
+            <!--                            and agree to abide by the terms and conditions of supply by Bayani Imports Pty Ltd on-->
+            <!--                            website (https://bayani.com.au/terms)."-->
+            <!--                        </p>-->
+            <!--                    </div>-->
+            <!--                </div>-->
+            <!--            </xpath>-->
             <xpath expr="//t[@t-foreach='lines_to_report']" position="after">
                 <tr class="amount_total_space_box">
                     <td colspan="2" class="empty_space"></td>
                     <td class="empty_space_box">
                         <div class="total_box">
-                            <span>Total Box: = </span><span t-esc="sum(lines_to_report.mapped('product_uom_qty'))"/>
+                            <span>Total Box: =</span>
+                            <span t-esc="sum(lines_to_report.mapped('product_uom_qty'))"/>
                         </div>
                     </td>
-                    <td t-att-colspan="5 if display_discount else 4" style="padding: 0; border: none;" class="amount_total_space_box">
-                    <style>
-                        .no-border-table,
-                        .no-border-table td,
-                        .no-border-table th,
-                        .no-border-table tr {
+                    <td t-att-colspan="5 if display_discount else 4" style="padding: 0; border: none;"
+                        class="amount_total_space_box">
+                        <style>
+                            .no-border-table,
+                            .no-border-table td,
+                            .no-border-table th,
+                            .no-border-table tr {
                             border: none !important;
                             outline: none !important;
                             box-shadow: none !important;
-                        }
+                            }
 
-                        .no-border-table {
+                            .no-border-table {
                             border-collapse: collapse !important;
                             width: 100%;
-                        }
-                        .no-border-table td {
+                            }
+                            .no-border-table td {
                             padding: 6px 10px !important; /* top-bottom, left-right */
-                        }
-                    </style>
+                            }
+                        </style>
 
-                    <table class="no-border-table" style="border:1px solid black !important;border-top:1px solid transparent !important;">
-                        <t t-if="doc.tax_totals">
-                            <t t-set="tax_totals" t-value="doc.tax_totals"/>
-                            <t t-set="currency" t-value="doc.currency_id"/>
-                            <t t-set="same_tax_base" t-value="tax_totals['same_tax_base']"/>
-                            <t t-foreach="tax_totals['subtotals']" t-as="subtotal">
-                                <tr class="o_subtotal">
-                                    <td>
-                                        <span t-out="subtotal['name']"/>
-                                    </td>
+                        <table class="no-border-table"
+                               style="border:1px solid black !important;border-top:1px solid transparent !important;">
+                            <t t-if="doc.tax_totals">
+                                <t t-set="tax_totals" t-value="doc.tax_totals"/>
+                                <t t-set="currency" t-value="doc.currency_id"/>
+                                <t t-set="same_tax_base" t-value="tax_totals['same_tax_base']"/>
+                                <t t-foreach="tax_totals['subtotals']" t-as="subtotal">
+                                    <tr class="o_subtotal">
+                                        <td>
+                                            <span t-out="subtotal['name']"/>
+                                        </td>
+                                        <td class="text-end">
+                                            <span t-out="subtotal['base_amount_currency']"
+                                                  t-options="{'widget': 'monetary', 'display_currency': currency}"/>
+                                        </td>
+                                    </tr>
+                                    <t t-foreach="subtotal['tax_groups']" t-as="tax_group">
+                                        <tr class="o_taxes">
+                                            <t t-if="same_tax_base or tax_group['display_base_amount_currency'] is None">
+                                                <td>
+                                                    <span class="text-nowrap" t-out="tax_group['group_name']"/>
+                                                </td>
+                                                <td class="text-end">
+                                                    <span class="text-nowrap"
+                                                          t-out="tax_group['tax_amount_currency']"
+                                                          t-options="{'widget': 'monetary', 'display_currency': currency}"/>
+                                                </td>
+                                            </t>
+                                            <t t-else="">
+                                                <td>
+                                                    <span t-out="tax_group['group_name']"/>
+                                                    on
+                                                    <span class="text-nowrap"
+                                                          t-out="tax_group['display_base_amount_currency']"
+                                                          t-options="{'widget': 'monetary', 'display_currency': currency}"/>
+                                                </td>
+                                                <td class="text-end">
+                                                    <span class="text-nowrap"
+                                                          t-out="tax_group['tax_amount_currency']"
+                                                          t-options="{'widget': 'monetary', 'display_currency': currency}"/>
+                                                </td>
+                                            </t>
+                                        </tr>
+                                    </t>
+                                </t>
+
+                                <tr t-if="'cash_rounding_base_amount_currency' in tax_totals">
+                                    <td>Rounding</td>
                                     <td class="text-end">
-                                        <span t-out="subtotal['base_amount_currency']"
+                                        <span t-out="tax_totals['cash_rounding_base_amount_currency']"
                                               t-options="{'widget': 'monetary', 'display_currency': currency}"/>
                                     </td>
                                 </tr>
-                                <t t-foreach="subtotal['tax_groups']" t-as="tax_group">
-                                    <tr class="o_taxes">
-                                        <t t-if="same_tax_base or tax_group['display_base_amount_currency'] is None">
-                                            <td>
-                                                <span class="text-nowrap" t-out="tax_group['group_name']"/>
-                                            </td>
-                                            <td class="text-end">
-                                                <span class="text-nowrap"
-                                                      t-out="tax_group['tax_amount_currency']"
-                                                      t-options="{'widget': 'monetary', 'display_currency': currency}"/>
-                                            </td>
-                                        </t>
-                                        <t t-else="">
-                                            <td>
-                                                <span t-out="tax_group['group_name']"/> on
-                                                <span class="text-nowrap"
-                                                      t-out="tax_group['display_base_amount_currency']"
-                                                      t-options="{'widget': 'monetary', 'display_currency': currency}"/>
-                                            </td>
-                                            <td class="text-end">
-                                                <span class="text-nowrap"
-                                                      t-out="tax_group['tax_amount_currency']"
-                                                      t-options="{'widget': 'monetary', 'display_currency': currency}"/>
-                                            </td>
-                                        </t>
-                                    </tr>
-                                </t>
+
+                                <tr style="background-color:#dc3545;color:white !important;">
+                                    <td>
+                                        <strong>Total</strong>
+                                    </td>
+                                    <td class="text-end">
+                                        <strong t-out="tax_totals['total_amount_currency']"
+                                                t-options="{'widget': 'monetary', 'display_currency': currency}"/>
+                                    </td>
+                                </tr>
                             </t>
-
-                            <tr t-if="'cash_rounding_base_amount_currency' in tax_totals">
-                                <td>Rounding</td>
-                                <td class="text-end">
-                                    <span t-out="tax_totals['cash_rounding_base_amount_currency']"
-                                          t-options="{'widget': 'monetary', 'display_currency': currency}"/>
-                                </td>
-                            </tr>
-
-                            <tr style="background-color:#dc3545;color:white !important;">
-                                <td><strong>Total</strong></td>
-                                <td class="text-end">
-                                    <strong t-out="tax_totals['total_amount_currency']"
-                                            t-options="{'widget': 'monetary', 'display_currency': currency}"/>
-                                </td>
-                            </tr>
-                        </t>
-                    </table>
+                        </table>
                     </td>
                 </tr>
             </xpath>
             <xpath expr="//div[@name='total']" position="replace">
                 <div id="total" class="row mt-n3" name="total">
-<!--                    <div class="col-6" style="margin-top:12px;page-break-inside: avoid;">-->
-<!--                        <p class="mx-auto" style="page-break-inside: avoid;">-->
-<!--                            Received by:-->
-<!--                            <br/>-->
-<!--                            Name:-->
-<!--                            <br/>-->
-<!--                            Sign:-->
-<!--                            <br/>-->
-<!--                            Date:-->
-<!--                            <br/>-->
-<!--                            "I/We acknowledge full receipt of the goods described in this copy of our customer invoice-->
-<!--                            and agree to abide by the terms and conditions of supply by Bayani Imports Pty Ltd on-->
-<!--                            website (https://bayani.com.au/terms)."-->
-<!--                        </p>-->
-<!--                    </div>-->
-<!--                    <div t-attf-class="#{'col-6' if report_type != 'html' else 'col-sm-7 col-md-6'}">-->
-<!--&lt;!&ndash;                        <table class="o_total_table table table-borderless">&ndash;&gt;-->
-<!--&lt;!&ndash;                            &lt;!&ndash; Tax totals &ndash;&gt;&ndash;&gt;-->
-<!--&lt;!&ndash;                            <t t-call="sale.document_tax_totals">&ndash;&gt;-->
-<!--&lt;!&ndash;                                <t t-set="tax_totals" t-value="doc.tax_totals"/>&ndash;&gt;-->
-<!--&lt;!&ndash;                                <t t-set="currency" t-value="doc.currency_id"/>&ndash;&gt;-->
-<!--&lt;!&ndash;                            </t>&ndash;&gt;-->
-<!--&lt;!&ndash;                        </table>&ndash;&gt;-->
-<!--                    </div>-->
+                    <!--                    <div class="col-6" style="margin-top:12px;page-break-inside: avoid;">-->
+                    <!--                        <p class="mx-auto" style="page-break-inside: avoid;">-->
+                    <!--                            Received by:-->
+                    <!--                            <br/>-->
+                    <!--                            Name:-->
+                    <!--                            <br/>-->
+                    <!--                            Sign:-->
+                    <!--                            <br/>-->
+                    <!--                            Date:-->
+                    <!--                            <br/>-->
+                    <!--                            "I/We acknowledge full receipt of the goods described in this copy of our customer invoice-->
+                    <!--                            and agree to abide by the terms and conditions of supply by Bayani Imports Pty Ltd on-->
+                    <!--                            website (https://bayani.com.au/terms)."-->
+                    <!--                        </p>-->
+                    <!--                    </div>-->
+                    <!--                    <div t-attf-class="#{'col-6' if report_type != 'html' else 'col-sm-7 col-md-6'}">-->
+                    <!--&lt;!&ndash;                        <table class="o_total_table table table-borderless">&ndash;&gt;-->
+                    <!--&lt;!&ndash;                            &lt;!&ndash; Tax totals &ndash;&gt;&ndash;&gt;-->
+                    <!--&lt;!&ndash;                            <t t-call="sale.document_tax_totals">&ndash;&gt;-->
+                    <!--&lt;!&ndash;                                <t t-set="tax_totals" t-value="doc.tax_totals"/>&ndash;&gt;-->
+                    <!--&lt;!&ndash;                                <t t-set="currency" t-value="doc.currency_id"/>&ndash;&gt;-->
+                    <!--&lt;!&ndash;                            </t>&ndash;&gt;-->
+                    <!--&lt;!&ndash;                        </table>&ndash;&gt;-->
+                    <!--                    </div>-->
                 </div>
 
+            </xpath>
+        </template>
+        <template id="report_custom_bayani_cr" inherit_id="web.external_layout_boxed">
+            <xpath expr="//div[contains(@t-attf-class, 'footer o_company_')]" position="replace">
+                <div t-attf-class="footer o_company_#{company.id}_layout {{report_type != 'pdf' and 'mt-auto'}}">
+                    <div class="o_footer_content row  pt-2 text-end">
+                        <div class="col-10"/>
+                        <div class="col-2 text-end">
+                            <span t-if="report_type == 'pdf'" class="text-muted">Page
+                                <span class="page"/>
+                                /
+                                <span class="topage"/>
+                            </span>
+                        </div>
+                        <!--                        </div>-->
+                    </div>
+                </div>
+            </xpath>
+        </template>
+
+        <template id="custom_external_layout_striped" inherit_id="web.external_layout_striped">
+            <xpath expr="//img[contains(@class, 'o_company_logo_big')]" position="attributes">
+                <attribute name="style">max-width: 500px; max-height: 500px;</attribute>
             </xpath>
         </template>
     </data>
