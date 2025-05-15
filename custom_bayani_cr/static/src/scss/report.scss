@@ -31,30 +31,30 @@
         }
 
     }
-     table[name="invoice_line_table"]{
-        border: 1px solid #374151 !important;
-        border-top: 1px solid transparent !important;
-        border-left: 1px solid transparent !important;
-        th{
-            border-top: 1px solid #374151 !important;
-            border-left: 1px solid #374151 !important;
-        }
-        td[name="account_invoice_line_name"]{
-            border-left: 1px solid #374151 !important;
-        }
-    }
-    table[name="sale_line_table"]{
-        border: 1px solid #374151 !important;
-        border-top: 1px solid transparent !important;
-        border-left: 1px solid transparent !important;
-        th{
-            border-top: 1px solid #374151 !important;
-            border-left: 1px solid #374151 !important;
-        }
-        td[name="td_name"]{
-            border-left: 1px solid #374151 !important;
-        }
-    }
+//      table[name="invoice_line_table"]{
+//         border: 1px solid #374151 !important;
+//         border-top: 1px solid transparent !important;
+//         border-left: 1px solid transparent !important;
+//         th{
+//             border-top: 1px solid #374151 !important;
+//             border-left: 1px solid #374151 !important;
+//         }
+//         td[name="account_invoice_line_name"]{
+//             border-left: 1px solid #374151 !important;
+//         }
+//     }
+//     table[name="sale_line_table"]{
+//         border: 1px solid #374151 !important;
+//         border-top: 1px solid transparent !important;
+//         border-left: 1px solid transparent !important;
+//         th{
+//             border-top: 1px solid #374151 !important;
+//             border-left: 1px solid #374151 !important;
+//         }
+//         td[name="td_name"]{
+//             border-left: 1px solid #374151 !important;
+//         }
+//     }
 }
 
 .amount_total_space_box{

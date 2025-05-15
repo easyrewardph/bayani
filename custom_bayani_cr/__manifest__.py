@@ -23,6 +23,7 @@
     'assets': {
         'web.assets_frontend': [
             'custom_bayani_cr/static/src/scss/product_page.scss',
+            # 'custom_bayani_cr/static/src/scss/report.scss',
             'custom_bayani_cr/static/src/js/custom_qty_selection.js',
         ],
         'web.report_assets_common': [

@@ -5,5 +5,7 @@
             <field name="name">Request for Account</field>
             <field name="color" eval="2"/>
         </record>
+
+
     </data>
 </odoo>
