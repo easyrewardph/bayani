@@ -34,13 +34,8 @@ class StockQuant(models.Model):
             
             res = self.search(domain, order=order)
         if removal_strategy == "closest":
-            _logger.info("---------res----------%s", res.mapped('location_id.complete_name'))
-
+            # res = res.sorted(lambda q: (q.location_id.complete_name, -q.id)) 
             # sort by expiration date first and then location name with alphabetical order
             # if expiration date is the same, sort by location name alphabetically nearby
-
-            res = res.sorted(lambda q: (q.lot_id.expiration_date, q.location_id.complete_name, -q.id))
-            _logger.info("-----------res---1------%s", res.mapped('location_id.complete_name'))
-            # res = res.sorted(lambda q: (q.location_id.complete_name, -q.id))
-            # print("-----------res---2------", res.mapped('location_id.complete_name'))
+            res = res.sorted(lambda q: (q.lot_id.expiration_date, q.location_id.complete_name))        
         return res.sorted(lambda q: not q.lot_id)
