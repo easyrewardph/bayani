@@ -86,32 +86,37 @@
             <!--            </xpath>-->
             <xpath expr="//thead" position="replace">
                 <thead style="border-top: 1px solid black; border-bottom:">
-                    <tr>
-                        <th name="th_description" class="text-start">
+                    <tr style="font-size:14px; font-weight: lighter;">
+                        <th name="th_description" style="width:50% !important;" class="text-start">
                             <span>Description</span>
                         </th>
-                        <th name="th_expiry_date" class="text-end text-nowrap">Expiry Date</th>
-                        <th name="th_quantity" class="text-end">
+                        <th style="text-align: center;width:6% !important;" name="th_expiry_date" class="text-nowrap" >Expiry Date</th>
+                        <th style="text-align: center;width:6% !important;" name="th_quantity" class="text-nowrap">
                             <span>Quantity</span>
                         </th>
-                        <th name="th_priceunit"
-                            t-attf-class="text-end text-nowrap {{ 'd-none d-md-table-cell' if report_type == 'html' else '' }}">
-                            <span>Unit Price ex GST</span>
+                        <th style="text-align: center;width:6% !important;" name="th_priceunit "
+                            t-attf-class="text-nowrap {{ 'd-none d-md-table-cell' if report_type == 'html' else '' }}">
+                            <span>Unit Price<br></br>ex GST
+                            </span>
                         </th>
-                        <th name="th_box_price" class="text-end text-nowrap">Box Price ex GST</th>
-                        <th name="th_discount" t-if="display_discount"
-                            t-attf-class="text-end {{ 'd-none d-md-table-cell' if report_type == 'html' else '' }}">
+                        <th name="th_box_price" style="text-align: center;width:6% !important;" class="text-nowrap">Box Price<br></br>ex GST
+                        </th>
+                        <th style="text-align: center;width:6% !important;" name="th_discount" t-if="display_discount"
+                            t-attf-class="text-nowrap {{ 'd-none d-md-table-cell' if report_type == 'html' else '' }}">
                             <span>Disc.%</span>
                         </th>
-                        <th name="th_total_ex_gst">
-                            <span>Total ex GST</span>
+                        <th name="th_total_ex_gst" style="text-align: center;width:6% !important;">
+                            <span style="text-align: center;">Total<br></br>ex GST
+                            </span>
                         </th>
-                        <th name="th_taxes"
-                            t-attf-class="text-end {{ 'd-none d-md-table-cell' if report_type == 'html' else '' }}">
+                        <th style="text-align: center;width:6% !important;" name="th_taxes"
+                            t-attf-class="text-nowrap {{ 'd-none d-md-table-cell' if report_type == 'html' else '' }}">
                             <span>GST</span>
                         </th>
-                        <th name="th_subtotal" class="text-end">
-                            <span>Total</span>
+                        <th style="text-align: center;width:8% !important;" name="th_subtotal" class="text-nowrap">
+                            <!--                            <span>Total</span>-->
+                            <span style="text-align: center;">Total INC.<br></br>GST
+                            </span>
                         </th>
                     </tr>
                 </thead>
@@ -247,101 +252,192 @@
 
 
             <xpath expr="//table" position="after">
-                <table class="o_has_total_table table o_main_table table-borderless"
-                       style="width:100%;margin-top:-17px; page-break-inside: avoid;">
+                <table style="width:100%; font-size:14px; margin-top:-17px; page-break-inside: avoid;"
+                       class="table table-borderless o_main_table">
+
                     <tr>
-                        <td colspan="2" style="vertical-align: top; padding: 10px; width:20px;">
-                            <p class="mx-auto" style="page-break-inside: avoid; font-size:12px;">
-                                <strong>Received by:</strong>
+                        <td style="width:36%; vertical-align: top; padding: 10px;" Rowspan="2">
+                            <p>
+                                Received by:
                                 <br/>Name:<br/>Sign:<br/>Date:
                                 <br/>
                                 <br/>
-                                "I/We acknowledge full receipt of the goods described in this copy of our customer
-                                invoice and agree to abide by the terms and conditions of supply by Bayani Imports Pty
-                                Ltd on website
+                                “I/We acknowledge full receipt of the goods
+                                described in this copy of our customer invoice and
+                                agree to abide by the terms and conditions of
+                                supply by Bayani Imports Pty Ltd on website
                                 <a href="https://bayani.com.au/terms" style="color:blue;">
-                                    https://bayani.com.au/terms</a>."
+                                    https://bayani.com.au/terms</a>.”
                             </p>
                         </td>
-                        <td style="vertical-align: top; padding: 10px; width:10px;">
-                            <div class="total_box" style="font-size:12px;">
-                                <strong>Total Box:</strong>
-                                <span t-esc="sum(lines.mapped('quantity'))"/>
+                        <td style="width:11%; vertical-align: top; padding: 10px;">
+                            <div>
+                                Total Box: =
+                                <span t-esc="'%.2f' % sum(lines.mapped('quantity'))"/>
                             </div>
-                        </td>
-                        <td t-att-colspan="6 if display_discount else 5"
-                            style="padding: 0; border: none; vertical-align: top;">
-                            <table class="o_has_total_table table o_main_table table-borderless"
-                                   style="width:100%; font-size:12px;">
-                                <t t-if="o.tax_totals">
-                                    <t t-set="tax_totals" t-value="o.tax_totals"/>
-                                    <t t-set="currency" t-value="o.currency_id"/>
-                                    <t t-set="same_tax_base" t-value="tax_totals['same_tax_base']"/>
-                                    <t t-foreach="tax_totals['subtotals']" t-as="subtotal">
-                                        <tr class="o_subtotal">
-                                            <td>
-                                                <span t-out="subtotal['name']"/>
-                                            </td>
+                            <td style="width:52%; vertical-align: top; padding: 0px;">
+                                <table style="width:100%; font-size:14px; margin-bottom:0px;"
+                                       class="table table-borderless">
+                                    <t t-if="o.tax_totals">
+                                        <t t-set="tax_totals" t-value="o.tax_totals"/>
+                                        <t t-set="currency" t-value="o.currency_id"/>
+                                        <t t-set="same_tax_base" t-value="tax_totals['same_tax_base']"/>
+                                        <t t-foreach="tax_totals['subtotals']" t-as="subtotal">
+                                            <tr>
+                                                <td>
+                                                    <span t-out="subtotal['name']"/>
+                                                </td>
+                                                <td class="text-end">
+                                                    <span t-out="subtotal['base_amount_currency']"
+                                                          t-options="{'widget': 'monetary', 'display_currency': currency}"/>
+                                                </td>
+                                            </tr>
+                                            <t t-foreach="subtotal['tax_groups']" t-as="tax_group">
+                                                <tr>
+                                                    <td>
+                                                        <span t-out="tax_group['group_name']"/>
+                                                        <t t-if="not same_tax_base and tax_group['display_base_amount_currency']">
+                                                            on
+                                                            <span t-out="tax_group['display_base_amount_currency']"
+                                                                  t-options="{'widget': 'monetary', 'display_currency': currency}"/>
+                                                        </t>
+                                                    </td>
+                                                    <td class="text-end">
+                                                        <span t-out="tax_group['tax_amount_currency']"
+                                                              t-options="{'widget': 'monetary', 'display_currency': currency}"/>
+                                                    </td>
+                                                </tr>
+                                            </t>
+                                        </t>
+                                        <tr t-if="'cash_rounding_base_amount_currency' in tax_totals">
+                                            <td>Rounding</td>
                                             <td class="text-end">
-                                                <span t-out="subtotal['base_amount_currency']"
+                                                <span t-out="tax_totals['cash_rounding_base_amount_currency']"
                                                       t-options="{'widget': 'monetary', 'display_currency': currency}"/>
                                             </td>
                                         </tr>
-                                        <t t-foreach="subtotal['tax_groups']" t-as="tax_group">
-                                            <tr class="o_taxes">
-                                                <t t-if="same_tax_base or tax_group['display_base_amount_currency'] is None">
-                                                    <td>
-                                                        <span t-out="tax_group['group_name']"/>
-                                                    </td>
-                                                    <td class="text-end">
-                                                        <span t-out="tax_group['tax_amount_currency']"
-                                                              t-options="{'widget': 'monetary', 'display_currency': currency}"/>
-                                                    </td>
-                                                </t>
-                                                <t t-else="">
-                                                    <td>
-                                                        <span t-out="tax_group['group_name']"/>
-                                                        on
-                                                        <span t-out="tax_group['display_base_amount_currency']"
-                                                              t-options="{'widget': 'monetary', 'display_currency': currency}"/>
-                                                    </td>
-                                                    <td class="text-end">
-                                                        <span t-out="tax_group['tax_amount_currency']"
-                                                              t-options="{'widget': 'monetary', 'display_currency': currency}"/>
-                                                    </td>
-                                                </t>
-                                            </tr>
-                                        </t>
+                                        <tr style="background-color:#dc3545; color:white;">
+                                            <td>
+                                                <strong style="color:white;">Total</strong>
+                                            </td>
+                                            <td class="text-end">
+                                                <strong style="color:white;" t-out="tax_totals['total_amount_currency']"
+                                                        t-options="{'widget': 'monetary', 'display_currency': currency}"/>
+                                            </td>
+                                        </tr>
                                     </t>
-                                    <tr t-if="'cash_rounding_base_amount_currency' in tax_totals">
-                                        <td>Rounding</td>
-                                        <td class="text-end">
-                                            <span t-out="tax_totals['cash_rounding_base_amount_currency']"
-                                                  t-options="{'widget': 'monetary', 'display_currency': currency}"/>
-                                        </td>
-                                    </tr>
-                                    <tr style="background-color:#dc3545; color:white;">
-                                        <td>
-                                            <strong>Total</strong>
-                                        </td>
-                                        <td class="text-end">
-                                            <strong t-out="tax_totals['total_amount_currency']"
-                                                    t-options="{'widget': 'monetary', 'display_currency': currency}"/>
-                                        </td>
-                                    </tr>
-                                </t>
-                            </table>
-                            <div style="margin-left:10px; font-size:12px;">
+                                </table>
+                            </td>
+
+                        </td>
+                    </tr>
+                    <tr>
+                        <td Colspan="2">
+                            <div style="margin-top:10px; padding:15px;">
                                 <u>
                                     <i>Payment Details:</i>
                                 </u>
-                                <br/>Account Name: Bayani Imports Pty Ltd<br/>BSB: 032 382
+                                <br/>
+                                Account Name: Bayani Imports Pty Ltd
+                                <br/>
+                                BSB: 032 382 &amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;Account No: 557
+                                555
                                 <br/>
                                 Please send remittance advice to
                                 <a href="mailto:bayani.imports@gmail.com">bayani.imports@gmail.com</a>
                             </div>
                         </td>
                     </tr>
+                    <!--                    <tr>-->
+                    <!--                        &lt;!&ndash; Left: Signature Section &ndash;&gt;-->
+                    <!--                        <td style="width:20%; vertical-align: top; padding: 10px;">-->
+                    <!--                            <p>-->
+                    <!--                                <strong>Received by:</strong>-->
+                    <!--                                <br/>Name:<br/>Sign:<br/>Date:-->
+                    <!--                                <br/>-->
+                    <!--                                <br/>-->
+                    <!--                                “I/We acknowledge full receipt of the goods described in this copy of our customer-->
+                    <!--                                invoice and agree to abide by the terms and conditions of supply by Bayani Imports Pty-->
+                    <!--                                Ltd on website-->
+                    <!--                                <a href="https://bayani.com.au/terms" style="color:blue;">-->
+                    <!--                                    https://bayani.com.au/terms</a>.”-->
+                    <!--                            </p>-->
+                    <!--                        </td>-->
+
+                    <!--                        &lt;!&ndash; Middle: Total Box &ndash;&gt;-->
+                    <!--                        <td style="width:6%; vertical-align: top; padding: 10px;">-->
+                    <!--                            <div>-->
+                    <!--                                <strong>Total Box:</strong>-->
+                    <!--                                <span t-esc="'%.2f' % sum(lines.mapped('quantity'))"/>-->
+                    <!--                            </div>-->
+                    <!--                        </td>-->
+
+                    <!--                        &lt;!&ndash; Right: Taxes and Payment Info &ndash;&gt;-->
+                    <!--                        <td style="width:52%; vertical-align: top; padding: 0px;">-->
+                    <!--                            <table style="width:100%; font-size:12px;" class="table table-borderless">-->
+                    <!--                                <t t-if="o.tax_totals">-->
+                    <!--                                    <t t-set="tax_totals" t-value="o.tax_totals"/>-->
+                    <!--                                    <t t-set="currency" t-value="o.currency_id"/>-->
+                    <!--                                    <t t-set="same_tax_base" t-value="tax_totals['same_tax_base']"/>-->
+                    <!--                                    <t t-foreach="tax_totals['subtotals']" t-as="subtotal">-->
+                    <!--                                        <tr>-->
+                    <!--                                            <td>-->
+                    <!--                                                <span t-out="subtotal['name']"/>-->
+                    <!--                                            </td>-->
+                    <!--                                            <td class="text-end">-->
+                    <!--                                                <span t-out="subtotal['base_amount_currency']"-->
+                    <!--                                                      t-options="{'widget': 'monetary', 'display_currency': currency}"/>-->
+                    <!--                                            </td>-->
+                    <!--                                        </tr>-->
+                    <!--                                        <t t-foreach="subtotal['tax_groups']" t-as="tax_group">-->
+                    <!--                                            <tr>-->
+                    <!--                                                <td>-->
+                    <!--                                                    <span t-out="tax_group['group_name']"/>-->
+                    <!--                                                    <t t-if="not same_tax_base and tax_group['display_base_amount_currency']">-->
+                    <!--                                                        on-->
+                    <!--                                                        <span t-out="tax_group['display_base_amount_currency']"-->
+                    <!--                                                              t-options="{'widget': 'monetary', 'display_currency': currency}"/>-->
+                    <!--                                                    </t>-->
+                    <!--                                                </td>-->
+                    <!--                                                <td class="text-end">-->
+                    <!--                                                    <span t-out="tax_group['tax_amount_currency']"-->
+                    <!--                                                          t-options="{'widget': 'monetary', 'display_currency': currency}"/>-->
+                    <!--                                                </td>-->
+                    <!--                                            </tr>-->
+                    <!--                                        </t>-->
+                    <!--                                    </t>-->
+                    <!--                                    <tr t-if="'cash_rounding_base_amount_currency' in tax_totals">-->
+                    <!--                                        <td>Rounding</td>-->
+                    <!--                                        <td class="text-end">-->
+                    <!--                                            <span t-out="tax_totals['cash_rounding_base_amount_currency']"-->
+                    <!--                                                  t-options="{'widget': 'monetary', 'display_currency': currency}"/>-->
+                    <!--                                        </td>-->
+                    <!--                                    </tr>-->
+                    <!--                                    <tr style="background-color:#dc3545; color:white;">-->
+                    <!--                                        <td>-->
+                    <!--                                            <strong>Total</strong>-->
+                    <!--                                        </td>-->
+                    <!--                                        <td class="text-end">-->
+                    <!--                                            <strong t-out="tax_totals['total_amount_currency']"-->
+                    <!--                                                    t-options="{'widget': 'monetary', 'display_currency': currency}"/>-->
+                    <!--                                        </td>-->
+                    <!--                                    </tr>-->
+                    <!--                                </t>-->
+                    <!--                            </table>-->
+                    <!--                            <div style="margin-top:10px; padding:15px;">-->
+                    <!--                                <u>-->
+                    <!--                                    <i>Payment Details:</i>-->
+                    <!--                                </u>-->
+                    <!--                                <br/>-->
+                    <!--                                Account Name: Bayani Imports Pty Ltd-->
+                    <!--                                <br/>-->
+                    <!--                                BSB: 032 382 &#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&ndash;&gt; Account No: 557 555-->
+                    <!--                                <br/>-->
+                    <!--                                Please send remittance advice to-->
+                    <!--                                <a href="mailto:bayani.imports@gmail.com">bayani.imports@gmail.com</a>-->
+                    <!--                            </div>-->
+                    <!--                        </td>-->
+                    <!--                    </tr>-->
                 </table>
 
 
@@ -779,24 +875,24 @@
 
             </xpath>
         </template>
-                <template id="report_custom_bayani_cr" inherit_id="web.external_layout_boxed">
-                    <xpath expr="//div[contains(@t-attf-class, 'footer o_company_')]" position="replace">
-                        <div style="max-height:20px;"
-                             t-attf-class="footer o_company_#{company.id}_layout {{report_type != 'pdf' and 'mt-auto'}}">
-                            <div class="row  pt-2 text-end">
-                                <div class="col-10"/>
-                                <div class="col-2 text-end">
-                                    <span t-if="report_type == 'pdf'" class="text-muted">Page
-                                        <span class="page"/>
-                                        /
-                                        <span class="topage"/>
-                                    </span>
-                                </div>
-                                <!--                        </div>-->
-                            </div>
+        <template id="report_custom_bayani_cr" inherit_id="web.external_layout_boxed">
+            <xpath expr="//div[contains(@t-attf-class, 'footer o_company_')]" position="replace">
+                <div style="max-height:20px;"
+                     t-attf-class="footer o_company_#{company.id}_layout {{report_type != 'pdf' and 'mt-auto'}}">
+                    <div class="row  pt-2 text-end">
+                        <div class="col-10"/>
+                        <div class="col-2 text-end">
+                            <span t-if="report_type == 'pdf'" class="text-muted">Page
+                                <span class="page"/>
+                                /
+                                <span class="topage"/>
+                            </span>
                         </div>
-                    </xpath>
-                </template>
+                        <!--                        </div>-->
+                    </div>
+                </div>
+            </xpath>
+        </template>
 
         <template id="custom_external_layout_striped" inherit_id="web.external_layout_striped">
             <xpath expr="//img[contains(@class, 'o_company_logo_big')]" position="attributes">
