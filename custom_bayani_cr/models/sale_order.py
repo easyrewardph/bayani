@@ -1,4 +1,4 @@
-from odoo import models, api, _
+from odoo import models, api, _, fields
 # from odoo.tools import html_keep_url, is_html_empty
 from odoo.tools.mail import html_keep_url
 from odoo.tools import (
@@ -53,6 +53,30 @@ class SaleOrder(models.Model):
 
 class SaleOrderLine(models.Model):
     _inherit = "sale.order.line"
+
+    expiry_date = fields.Datetime(string="Expiry Date", compute='_compute_expiry_date', store=True, readonly=True)
+
+    @api.depends('product_id', 'product_uom_qty')
+    def _compute_expiry_date(self):
+        for line in self:
+            expiry_date = False
+            if line.product_id:
+                quants = self.env['stock.quant'].search([
+                    ('product_id', '=', line.product_id.id),
+                    ('quantity', '>', 0),
+                    ('location_id.usage', '=', 'internal'),
+                ])
+
+                valid_lots = [
+                    q.lot_id for q in quants
+                    if (q.quantity - q.reserved_quantity > 0)
+                       and q.lot_id and q.lot_id.expiration_date
+                ]
+                if valid_lots:
+                    valid_lots.sort(key=lambda lot: lot.expiration_date)
+                    expiry_date = valid_lots[0].expiration_date
+
+            line.expiry_date = expiry_date
 
     def get_saleline_expiry_date(self):
         if self and self.move_ids:
