@@ -160,7 +160,8 @@
                         <td name="td_price_unit"
                             t-attf-class="text-end {{ 'd-none d-md-table-cell' if report_type == 'html' else '' }}">
                             <t t-set="discounted_box_price" t-value="line.price_unit * (1 - (line.discount or 0) / 100)"/>
-                            <t t-set="unit_price" t-value="discounted_box_price / line.product_id.base_unit_count if line.product_id.base_unit_count else discounted_box_price"/>
+                            <t t-set="base_count" t-value="(line.product_id and line.product_id.base_unit_count) or 0"/>
+                            <t t-set="unit_price" t-value="discounted_box_price / base_count if base_count > 0 else discounted_box_price"/>
                             <t t-if="counter > 0">
                                 <span class="text-nowrap" t-esc="unit_price"
                                       t-options="{'widget': 'monetary', 'display_currency': line.currency_id}"
@@ -625,7 +626,8 @@
 
                         <td name="td_priceunit" class="text-end text-nowrap">
                             <t t-set="discounted_box_price" t-value="line.price_unit * (1 - (line.discount or 0) / 100)"/>
-                            <t t-set="unit_price" t-value="discounted_box_price / line.product_id.base_unit_count if line.product_id.base_unit_count else discounted_box_price"/>
+                            <t t-set="base_count" t-value="(line.product_id and line.product_id.base_unit_count) or 0"/>
+                            <t t-set="unit_price" t-value="discounted_box_price / base_count if base_count > 0 else discounted_box_price"/>
                             <t t-if="counter > 0">
                                 <span t-esc="unit_price"
                                       t-options="{'widget': 'monetary', 'display_currency': line.currency_id}"
