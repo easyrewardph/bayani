@@ -54,7 +54,7 @@ class SaleOrder(models.Model):
 class SaleOrderLine(models.Model):
     _inherit = "sale.order.line"
 
-    expiry_date = fields.Datetime(string="Expiry Date", compute='_compute_expiry_date', store=True, readonly=True)
+    expiry_date = fields.Datetime(string="Expiry Date", compute='_compute_expiry_date', store=False, readonly=True)
 
     @api.depends('product_id', 'product_uom_qty')
     def _compute_expiry_date(self):
