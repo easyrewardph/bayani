@@ -1,4 +1,4 @@
-from odoo import models, api, _
+from odoo import models, fields, api, _
 # from odoo.tools import is_html_empty, html_keep_url
 from odoo.tools.mail import html_keep_url
 from odoo.tools import (
@@ -57,6 +57,34 @@ class AccountMove(models.Model):
 
 class AccountMoveLine(models.Model):
     _inherit = "account.move.line"
+
+    unit_price_per_unit = fields.Monetary(
+        string="Unit Price ex GST / unit",
+        compute="_compute_unit_price_per_unit",
+        currency_field="currency_id",
+        store=False,
+    )
+
+    @api.depends("price_subtotal", "quantity", "product_id.base_unit_count")
+    def _compute_unit_price_per_unit(self):
+        """
+        unit price per piece = final line subtotal (ex GST)
+                               / (invoice qty in boxes * units per box)
+
+        This uses the REAL price charged on the invoice, independent
+        of the product's base unit price or pricelist config.
+        """
+        for line in self:
+            base_count = line.product_id.base_unit_count if line.product_id else 0.0
+            qty = line.quantity or 0.0
+            total_units = qty * base_count
+
+            if total_units:
+                # price_subtotal is ex GST, so this stays "Unit price ex GST"
+                line.unit_price_per_unit = (line.price_subtotal or 0.0) / total_units
+            else:
+                # fallback: if we can't compute, show box price
+                line.unit_price_per_unit = line.price_unit or 0.0
 
     def get_expiry_date(self):
         if self.sale_line_ids and self.sale_line_ids.move_ids:
