@@ -56,6 +56,33 @@ class SaleOrderLine(models.Model):
 
     expiry_date = fields.Datetime(string="Expiry Date", compute='_compute_expiry_date', store=False, readonly=True)
 
+    unit_price_per_unit = fields.Monetary(
+        string="Unit Price / unit",
+        compute="_compute_unit_price_per_unit",
+        currency_field="currency_id",
+        store=False,
+    )
+
+    @api.depends("price_subtotal", "product_uom_qty", "product_id.base_unit_count")
+    def _compute_unit_price_per_unit(self):
+        """
+        unit price per piece = final line subtotal
+                               / (qty in boxes * units per box)
+
+        This uses the REAL price charged, independent of the product's
+        base unit price or pricelist config.
+        """
+        for line in self:
+            base_count = line.product_id.base_unit_count if line.product_id else 0.0
+            qty = line.product_uom_qty or 0.0
+            total_units = qty * base_count
+
+            if total_units:
+                line.unit_price_per_unit = (line.price_subtotal or 0.0) / total_units
+            else:
+                # fallback: if we can't compute, show box price
+                line.unit_price_per_unit = line.price_unit or 0.0
+
     @api.depends('product_id', 'product_uom_qty')
     def _compute_expiry_date(self):
         for line in self:
