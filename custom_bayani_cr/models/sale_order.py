@@ -56,6 +56,17 @@ class SaleOrderLine(models.Model):
 
     expiry_date = fields.Datetime(string="Expiry Date", compute='_compute_expiry_date', store=False, readonly=True)
 
+    @api.depends('product_id', 'product_uom', 'product_uom_qty')
+    def _compute_name(self):
+        """Override to remove 'Option:' prefix from the description."""
+        super()._compute_name()
+        for line in self:
+            if line.name:
+                # Remove lines that start with "Option:" from the description
+                lines = line.name.split('\n')
+                filtered_lines = [l for l in lines if not l.strip().startswith('Option:')]
+                line.name = '\n'.join(filtered_lines)
+
     unit_price_per_unit = fields.Monetary(
         string="Unit Price / unit",
         compute="_compute_unit_price_per_unit",
