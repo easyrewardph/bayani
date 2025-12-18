@@ -51,6 +51,27 @@ class SaleOrder(models.Model):
         final = sale_order_line_forzen + sale_order_line_dry
         return final
 
+    def _create_delivery_line(self, carrier, price_unit):
+        """Override to prevent automatic delivery fee population."""
+        # Do not create delivery line - return empty recordset
+        return self.env['sale.order.line']
+
+    def set_delivery_line(self, carrier, amount):
+        """Override to prevent automatic delivery fee population when carrier is set."""
+        # Remove any existing delivery lines to prevent auto-population
+        for order in self:
+            order.order_line.filtered(lambda l: l.is_delivery).unlink()
+        # Do not create new delivery line - return True without creating anything
+        return True
+
+    def write(self, vals):
+        """Override write to ensure delivery lines are removed after any update."""
+        result = super(SaleOrder, self).write(vals)
+        # Remove any delivery lines that might have been created
+        for order in self:
+            order.order_line.filtered(lambda l: l.is_delivery).unlink()
+        return result
+
 class SaleOrderLine(models.Model):
     _inherit = "sale.order.line"
 
