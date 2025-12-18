@@ -160,12 +160,11 @@
                         <td name="td_price_unit"
                             t-attf-class="text-end {{ 'd-none d-md-table-cell' if report_type == 'html' else '' }}">
                             <t t-if="counter > 0">
-                                <span class="text-nowrap" t-field="line.product_id.base_unit_price"
-                                      style="font-size:12px;">9.00
-                                </span>
+                                <span class="text-nowrap" t-field="line.unit_price_per_unit"
+                                      style="font-size:12px;"/>
                             </t>
                             <t t-else="">
-                                <span class="text-nowrap" t-field="line.product_id.base_unit_price">9.00</span>
+                                <span class="text-nowrap" t-field="line.unit_price_per_unit"/>
                             </t>
                         </td>
                         <t t-set="t" t-value="round(line.price_unit * line.quantity,2)"/>
@@ -589,10 +588,10 @@
                         <t t-set="exp" t-value="line.get_saleline_expiry_date()"/>
                         <td name="td_expiry_date" class="text-end">
                             <t t-if="counter > 0">
-                                <span t-esc="exp" style="font-size:12px;" t-options='{"widget": "date"}'>-</span>
+                                <span t-esc="line.expiry_date" style="font-size:12px;" t-options='{"widget": "date"}'>-</span>
                             </t>
                             <t t-else="">
-                                <span t-esc="exp" t-options='{"widget": "date"}'>-</span>
+                                <span t-esc="line.expiry_date" t-options='{"widget": "date"}'>-</span>
                             </t>
                         </td>
 
@@ -622,10 +621,11 @@
 
                         <td name="td_priceunit" class="text-end text-nowrap">
                             <t t-if="counter > 0">
-                                <span t-field="line.product_id.base_unit_price" style="font-size:12px;">3</span>
+                                <span t-field="line.unit_price_per_unit"
+                                      style="font-size:12px;"/>
                             </t>
                             <t t-else="">
-                                <span t-field="line.product_id.base_unit_price">3</span>
+                                <span t-field="line.unit_price_per_unit"/>
                             </t>
                         </td>
 
@@ -831,7 +831,7 @@
                                     </td>
                                 </tr>
 
-                                <tr style="background-color:#dc3545;color:white !important;">
+                                <tr style="background-color:#dc3545;color:white !important; font-size: 35px;">
                                     <td>
                                         <strong>Total</strong>
                                     </td>

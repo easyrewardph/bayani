@@ -2,7 +2,7 @@
     'name': 'Hide Price, Add To Cart Button, Quantity From website',
     'category': 'eCommerce',
     'summary': 'Hide the price, Add TO Cart Button and Quantity of the product if user is not login',
-    'version': '18.0.1.0',
+    'version': '18.0.1.1',
     'website': "https://www.candidroot.com/",
     'author': "Candidroot Solutions Pvt. Ltd.",
     'description': """This module helps to Hide the price,Cart Button and quantity of the product if user is not login.""",
@@ -11,6 +11,7 @@
     'data': [
         'data/contact_tag.xml',
         'views/product_category.xml',
+        'views/sale_order_line_view.xml',
         'views/website_template_inherit.xml',
         'views/res_config_view.xml',
         'views/web_client_template.xml',
