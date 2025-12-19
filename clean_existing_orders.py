@@ -12,6 +12,14 @@ Or copy-paste the code below into Odoo shell.
 """
 
 # Get all sale orders
+print(f"Connected to Database: {env.cr.dbname}")
+
+if 'sale.order' not in env:
+    print("ERROR: The 'sale.order' model was not found in this database.")
+    print("Please ensure you are connected to the correct database and the Sales app is installed.")
+    import sys
+    sys.exit(1)
+
 orders = env['sale.order'].search([])
 print(f"Found {len(orders)} sale orders to process...")
 

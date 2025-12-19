@@ -2,10 +2,12 @@
     <record id="view_order_form_inherit_expiry" model="ir.ui.view">
         <field name="name">sale.order.form.expiry</field>
         <field name="model">sale.order</field>
+        <field name="sequence">1</field>
         <field name="inherit_id" ref="sale.view_order_form"/>
         <field name="arch" type="xml">
             <xpath expr="//field[@name='order_line']/list/field[@name='price_unit']" position="after">
                 <field name="expiry_date"/>
+                <field name="custom_test_field"/>
             </xpath>
         </field>
     </record>

@@ -84,6 +84,7 @@ class SaleOrderLine(models.Model):
     _inherit = "sale.order.line"
 
     expiry_date = fields.Datetime(string="Expiry Date", compute='_compute_expiry_date', store=False, readonly=True)
+    custom_test_field = fields.Char(string="Test Field", compute='_compute_custom_test_field')
 
     def _clean_option_lines(self, name_text):
         """Helper method to remove option lines from name."""
@@ -162,6 +163,10 @@ class SaleOrderLine(models.Model):
             else:
                 # fallback: if we can't compute, show box price
                 line.unit_price_per_unit = line.price_unit or 0.0
+
+    def _compute_custom_test_field(self):
+        for line in self:
+            line.custom_test_field = "this is test value"
 
     @api.depends('product_id', 'product_uom_qty')
     def _compute_expiry_date(self):
