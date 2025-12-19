@@ -22,12 +22,17 @@ removed_delivery_lines = 0
 for order in orders:
     order_modified = False
     
-    # Remove delivery lines
-    delivery_lines = order.order_line.filtered(lambda l: l.is_delivery)
-    if delivery_lines:
-        removed_delivery_lines += len(delivery_lines)
-        delivery_lines.unlink()
-        order_modified = True
+    # Remove delivery lines - SKIPPED per user request
+    # delivery_lines = order.order_line.filtered(lambda l: l.is_delivery)
+    # if delivery_lines:
+    #     try:
+    #         # Only delete if not locked or force delete
+    #         if order.state not in ['sale', 'done']:
+    #             removed_delivery_lines += len(delivery_lines)
+    #             delivery_lines.unlink()
+    #             order_modified = True
+    #     except Exception:
+    #         pass
     
     # Clean option lines from descriptions
     for line in order.order_line:
@@ -51,5 +56,6 @@ print(f"\nSummary:")
 print(f"  - Orders cleaned: {cleaned_orders}")
 print(f"  - Lines with options removed: {cleaned_lines}")
 print(f"  - Delivery lines removed: {removed_delivery_lines}")
+env.cr.commit()
 print("Done!")
 
