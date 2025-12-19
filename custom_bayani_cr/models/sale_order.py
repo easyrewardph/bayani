@@ -1,6 +1,7 @@
 from odoo import models, api, _, fields
 from odoo.tools.mail import html_keep_url
 from odoo.tools import is_html_empty
+import re
 
 
 class SaleOrder(models.Model):
@@ -65,8 +66,9 @@ class SaleOrder(models.Model):
             # Remove delivery lines
             order.order_line.filtered(lambda l: l.is_delivery).unlink()
             # Clean option lines from all order lines
+            # Clean option lines from all order lines
             for line in order.order_line:
-                if line.name and ('Option:' in line.name or 'Option for:' in line.name):
+                if line.name and re.search(r'Option(\s+for)?\s*:', line.name, re.IGNORECASE):
                     cleaned_name = line._clean_option_lines(line.name)
                     if cleaned_name != line.name:
                         line.name = cleaned_name
@@ -90,7 +92,7 @@ class SaleOrderLine(models.Model):
         lines = name_text.split('\n')
         filtered_lines = [
             l for l in lines 
-            if not (l.strip().startswith('Option:') or l.strip().startswith('Option for:'))
+            if not re.match(r'^\s*Option(\s+for)?\s*:', l, re.IGNORECASE)
         ]
         return '\n'.join(filtered_lines)
 
@@ -112,7 +114,7 @@ class SaleOrderLine(models.Model):
         
         # Always clean option lines after write to ensure they're removed
         for line in self:
-            if line.name and ('Option:' in line.name or 'Option for:' in line.name):
+            if line.name and re.search(r'Option(\s+for)?\s*:', line.name, re.IGNORECASE):
                 line.name = self._clean_option_lines(line.name)
         
         return result
@@ -129,7 +131,7 @@ class SaleOrderLine(models.Model):
         
         # Clean names after creation (in case _compute_name set them with options)
         for line in lines:
-            if line.name and ('Option:' in line.name or 'Option for:' in line.name):
+            if line.name and re.search(r'Option(\s+for)?\s*:', line.name, re.IGNORECASE):
                 line.name = self._clean_option_lines(line.name)
         
         return lines

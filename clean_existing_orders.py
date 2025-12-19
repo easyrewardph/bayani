@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import re
 """
 Script to clean existing sale orders from:
 1. Delivery lines (is_delivery = True)
@@ -30,11 +31,11 @@ for order in orders:
     
     # Clean option lines from descriptions
     for line in order.order_line:
-        if line.name and ('Option:' in line.name or 'Option for:' in line.name):
+        if line.name and re.search(r'Option(\s+for)?\s*:', line.name, re.IGNORECASE):
             lines = line.name.split('\n')
             filtered_lines = [
                 l for l in lines 
-                if not (l.strip().startswith('Option:') or l.strip().startswith('Option for:'))
+                if not re.match(r'^\s*Option(\s+for)?\s*:', l, re.IGNORECASE)
             ]
             new_name = '\n'.join(filtered_lines)
             if new_name != line.name:
