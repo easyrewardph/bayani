@@ -63,8 +63,8 @@ class SaleOrder(models.Model):
     def _clean_order_lines(self):
         """Clean all order lines from option text and delivery lines."""
         for order in self:
-            # Remove delivery lines
-            order.order_line.filtered(lambda l: l.is_delivery).unlink()
+            # Remove delivery lines - DISABLED as per user request to not delete lines
+            # order.order_line.filtered(lambda l: l.is_delivery).unlink()
             # Clean option lines from all order lines
             # Clean option lines from all order lines
             for line in order.order_line:
