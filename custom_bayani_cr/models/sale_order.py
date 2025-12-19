@@ -1,9 +1,6 @@
 from odoo import models, api, _, fields
-# from odoo.tools import html_keep_url, is_html_empty
 from odoo.tools.mail import html_keep_url
-from odoo.tools import (
-    is_html_empty
-)
+from odoo.tools import is_html_empty
 
 
 class SaleOrder(models.Model):
@@ -18,10 +15,8 @@ class SaleOrder(models.Model):
             order = order.with_company(order.company_id)
             if order.terms_type == 'html' and self.env.company.invoice_terms_html:
                 baseurl = html_keep_url(order._get_note_url() + '/terms')
-                context = {'lang': order.partner_id.lang or self.env.user.lang}
                 order.note = _('Terms & Conditions: %s',
                                baseurl) + '<p><strong>Bank Details:</strong></p><p>Account Name: Bayani Imports Pty Ltd,<span class="oe-tabs" style="width: 34.0625px;">	</span>​</p><p>BSB Number: 032 382</p><p>Account Number: 557 555</p><p>Bank: Westpac</p><p>Send remittance advice to <a href="https://bayani.imports@gmail.com">bayani.imports@gmail.com</a><br></p>'
-                del context
             elif not is_html_empty(self.env.company.invoice_terms):
                 order.note = order.with_context(lang=order.partner_id.lang).env.company.invoice_terms
 
@@ -45,7 +40,7 @@ class SaleOrder(models.Model):
             sale_order_line_forzen += r
 
         dry_product = lines - sale_order_line_forzen
-        dry_product = sorted(dry_product,key=lambda l: l.product_id.name)
+        dry_product = sorted(dry_product, key=lambda l: l.product_id.name)
         for d in dry_product:
             sale_order_line_dry += d
         final = sale_order_line_forzen + sale_order_line_dry
@@ -72,12 +67,7 @@ class SaleOrder(models.Model):
             # Clean option lines from all order lines
             for line in order.order_line:
                 if line.name and ('Option:' in line.name or 'Option for:' in line.name):
-                    lines = line.name.split('\n')
-                    filtered_lines = [
-                        l for l in lines 
-                        if not (l.strip().startswith('Option:') or l.strip().startswith('Option for:'))
-                    ]
-                    cleaned_name = '\n'.join(filtered_lines)
+                    cleaned_name = line._clean_option_lines(line.name)
                     if cleaned_name != line.name:
                         line.name = cleaned_name
 
@@ -115,12 +105,12 @@ class SaleOrderLine(models.Model):
     def write(self, vals):
         """Override write to clean option lines from name when line is updated."""
         # Clean name before write if it's being set
-        if 'name' in vals and vals['name']:
+        if 'name' in vals and vals.get('name'):
             vals['name'] = self._clean_option_lines(vals['name'])
         
         result = super(SaleOrderLine, self).write(vals)
         
-        # Always clean option lines after write, regardless of what was changed
+        # Always clean option lines after write to ensure they're removed
         for line in self:
             if line.name and ('Option:' in line.name or 'Option for:' in line.name):
                 line.name = self._clean_option_lines(line.name)
@@ -137,7 +127,7 @@ class SaleOrderLine(models.Model):
         
         lines = super(SaleOrderLine, self).create(vals_list)
         
-        # Clean names after creation (in case compute set them)
+        # Clean names after creation (in case _compute_name set them with options)
         for line in lines:
             if line.name and ('Option:' in line.name or 'Option for:' in line.name):
                 line.name = self._clean_option_lines(line.name)
@@ -194,15 +184,16 @@ class SaleOrderLine(models.Model):
             line.expiry_date = expiry_date
 
     def get_saleline_expiry_date(self):
-        if self and self.move_ids:
-            move = self.move_ids
-            if move:
-                line = self.env['stock.move.line'].sudo().search([('move_id', '=', int(move[0].id))])
-                if line.mapped('lot_id') and line.mapped('lot_id').mapped('expiration_date'):
-                    return str(max(line.mapped('lot_id').mapped('expiration_date')).date())
-                else:
-                    return '-'
-            else:
-                return '-'
-        else:
+        """Get expiry date from stock move lines."""
+        if not self or not self.move_ids:
             return '-'
+        
+        move = self.move_ids[0]
+        if not move:
+            return '-'
+        
+        line = self.env['stock.move.line'].sudo().search([('move_id', '=', move.id)], limit=1)
+        if line and line.lot_id and line.lot_id.expiration_date:
+            return str(line.lot_id.expiration_date.date())
+        
+        return '-'
