@@ -7,6 +7,16 @@
             <xpath expr="//field[@name='order_line']/list/field[@name='price_unit']" position="after">
                 <field name="expiry_date"/>
             </xpath>
+            <!-- Hide Options tab/page in sale order form -->
+            <xpath expr="//page[@name='optional_products']" position="attributes">
+                <attribute name="invisible">1</attribute>
+            </xpath>
+            <xpath expr="//page[@name='options']" position="attributes">
+                <attribute name="invisible">1</attribute>
+            </xpath>
+            <xpath expr="//field[@name='optional_product_ids']" position="attributes">
+                <attribute name="invisible">1</attribute>
+            </xpath>
         </field>
     </record>
 </odoo>
