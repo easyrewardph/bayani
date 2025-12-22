@@ -1,6 +1,17 @@
+/** @odoo-module **/
 // Fix for cart summary innerHTML error
 // This directly patches the _updateCartSummary method to safely handle null elements
 // Only applies on checkout/cart pages to avoid interfering with login and other pages
+
+// Define as a module but don't require any dependencies
+odoo.define('custom_bayani_cr.cart_summary_fix', function(require) {
+    'use strict';
+    
+    // No dependencies required - this is a standalone fix
+    return {};
+});
+
+// Execute the fix immediately
 (function() {
     'use strict';
 
@@ -106,63 +117,11 @@
         }
     }
 
-    // Function to try patching the widget when available
-    function tryPatchWidget() {
-        // Only patch on checkout/cart pages, not on login
-        if (isLoginPage()) {
-            return;
-        }
-        
-        // Try to find and patch the widget through various methods
-        if (typeof odoo !== 'undefined' && odoo.define) {
-            // Use odoo.define but don't require the module - just wait for it
-            try {
-                odoo.define('custom_bayani_cr.cart_summary_fix', function(require) {
-                    try {
-                        var publicWidget = require('web.public.widget');
-                        if (publicWidget && publicWidget.registry && publicWidget.registry.website_sale_delivery) {
-                            var widgetClass = publicWidget.registry.website_sale_delivery;
-                            if (widgetClass && widgetClass.prototype) {
-                                var originalMethod = widgetClass.prototype._updateCartSummary;
-                                if (originalMethod && !originalMethod._isPatched) {
-                                    widgetClass.prototype._updateCartSummary = function(summary) {
-                                        // Use our safe method
-                                        if (!safeUpdateCartSummary(this.$, summary)) {
-                                            // If not found, try original but catch errors
-                                            try {
-                                                if (originalMethod) {
-                                                    return originalMethod.call(this, summary);
-                                                }
-                                            } catch (e) {
-                                                // Silently handle - element doesn't exist
-                                                if (isCheckoutOrCartPage() && !isLoginPage()) {
-                                                    console.warn('Cart summary update skipped - element not found');
-                                                }
-                                            }
-                                        }
-                                    };
-                                    originalMethod._isPatched = true;
-                                }
-                            }
-                        }
-                    } catch (e) {
-                        // Module not available, will retry
-                    }
-                });
-            } catch (e) {
-                // odoo.define failed
-            }
-        }
-    }
-
     // Try patching on various events, but only on relevant pages
     $(document).ready(function() {
         if (!isLoginPage() && isCheckoutOrCartPage()) {
-            tryPatchWidget();
-            setTimeout(tryPatchWidget, 100);
-            setTimeout(tryPatchWidget, 500);
-            setTimeout(tryPatchWidget, 1000);
-            setTimeout(tryPatchWidget, 2000);
+            // The innerHTML patch above should handle most cases
+            // No need to patch the widget directly as it causes module dependency issues
         }
     });
 
