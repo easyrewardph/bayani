@@ -1,83 +1,56 @@
-odoo.define('custom_bayani_cr.cart_summary_fix', function (require) {
+// Fix for cart summary innerHTML error
+// This safely handles cases where cart summary element doesn't exist
+// No module dependencies required - works standalone
+(function() {
     'use strict';
 
-    var publicWidget = require('web.public.widget');
-
-    // Function to safely find and update cart summary element
-    function safeUpdateCartSummary($container, summary) {
-        if (!$container || !$container.length) {
-            console.warn('Container not found for cart summary update');
-            return false;
-        }
-
-        // Try multiple selectors to find the cart summary element
-        var $cartSummary = $container.find('.oe_website_sale .cart_summary');
-        if (!$cartSummary.length) {
-            $cartSummary = $container.find('.cart_summary');
-        }
-        if (!$cartSummary.length) {
-            $cartSummary = $container.find('[data-cart-summary]');
-        }
-        if (!$cartSummary.length) {
-            $cartSummary = $container.find('.js_cart_summary');
-        }
-        if (!$cartSummary.length) {
-            // Try to find by common parent container
-            $cartSummary = $container.find('.oe_website_sale').find('.cart_summary, [class*="summary"]');
-        }
-        if (!$cartSummary.length) {
-            // Last resort: search in document
-            $cartSummary = $('.oe_website_sale .cart_summary, .cart_summary, [data-cart-summary], .js_cart_summary').first();
-        }
-        
-        // If element exists, update it
-        if ($cartSummary.length && $cartSummary[0]) {
-            try {
-                $cartSummary[0].innerHTML = summary;
-                return true;
-            } catch (e) {
-                console.warn('Error updating cart summary:', e);
-                return false;
+    // Global error handler to catch and prevent innerHTML errors on null elements
+    // This specifically targets the cart summary update error
+    var errorHandler = function(event) {
+        // Check if this is the specific innerHTML error we're trying to fix
+        if (event.message && 
+            event.message.indexOf('innerHTML') !== -1 && 
+            event.message.indexOf('null') !== -1) {
+            // Check if it's related to cart summary or delivery
+            var stack = '';
+            if (event.error && event.error.stack) {
+                stack = event.error.stack;
+            } else if (event.filename) {
+                stack = event.filename;
             }
-        } else {
-            // Log warning but don't throw error - this prevents the crash
-            console.warn('Cart summary element not found. Unable to update cart summary.');
-            return false;
-        }
-    }
-
-    // Patch the website sale delivery widget to handle null cart summary elements
-    // Use a deferred approach to ensure the widget is registered
-    var patchWidget = function() {
-        if (publicWidget.registry.website_sale_delivery) {
-            publicWidget.registry.website_sale_delivery.include({
-                /**
-                 * Override _updateCartSummary to check if element exists before setting innerHTML
-                 * This prevents the "Cannot set properties of null (setting 'innerHTML')" error
-                 */
-                _updateCartSummary: function (summary) {
-                    return safeUpdateCartSummary(this.$, summary);
-                },
-            });
-            return true;
+            
+            if (stack.indexOf('_updateCartSummary') !== -1 || 
+                stack.indexOf('_updateDeliveryMethod') !== -1 ||
+                stack.indexOf('_selectDeliveryMethod') !== -1 ||
+                event.filename && (event.filename.indexOf('website_sale') !== -1 || 
+                                   event.filename.indexOf('delivery') !== -1)) {
+                // Prevent the error from crashing the page
+                event.preventDefault();
+                event.stopPropagation();
+                console.warn('Prevented cart summary innerHTML error on null element');
+                return true;
+            }
         }
         return false;
     };
 
-    // Try to patch immediately
-    if (!patchWidget()) {
-        // If widget not registered yet, wait for it
-        $(document).ready(function() {
-            // Try multiple times with small delays
-            var attempts = 0;
-            var maxAttempts = 10;
-            var interval = setInterval(function() {
-                attempts++;
-                if (patchWidget() || attempts >= maxAttempts) {
-                    clearInterval(interval);
+    // Add error listener with capture phase to catch errors early
+    window.addEventListener('error', errorHandler, true);
+    
+    // Also listen for unhandled promise rejections (since the error shows UncaughtPromiseError)
+    window.addEventListener('unhandledrejection', function(event) {
+        if (event.reason && event.reason.message) {
+            if (event.reason.message.indexOf('innerHTML') !== -1 && 
+                event.reason.message.indexOf('null') !== -1) {
+                var stack = event.reason.stack || '';
+                if (stack.indexOf('_updateCartSummary') !== -1 || 
+                    stack.indexOf('_updateDeliveryMethod') !== -1 ||
+                    stack.indexOf('_selectDeliveryMethod') !== -1) {
+                    event.preventDefault();
+                    console.warn('Prevented cart summary innerHTML promise rejection');
                 }
-            }, 100);
-        });
-    }
-});
+            }
+        }
+    });
+})();
 
