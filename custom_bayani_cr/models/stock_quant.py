@@ -1,6 +1,6 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 import logging
-
+from datetime import datetime
 
 from odoo import _, models
 
@@ -37,5 +37,19 @@ class StockQuant(models.Model):
             # res = res.sorted(lambda q: (q.location_id.complete_name, -q.id)) 
             # sort by expiration date first and then location name with alphabetical order
             # if expiration date is the same, sort by location name alphabetically nearby
-            res = res.sorted(lambda q: (q.lot_id.expiration_date, q.location_id.complete_name))        
+            # Handle cases where lot_id might be False or expiration_date might be False/None
+            def sort_key(q):
+                # If no lot_id, use max datetime so it sorts last
+                if not q.lot_id:
+                    exp_date = datetime.max
+                # If lot_id exists but no expiration_date, use max datetime
+                elif not q.lot_id.expiration_date:
+                    exp_date = datetime.max
+                else:
+                    exp_date = q.lot_id.expiration_date
+                # Handle location name - use empty string if None/False
+                location_name = q.location_id.complete_name or ''
+                return (exp_date, location_name)
+            
+            res = res.sorted(key=sort_key)
         return res.sorted(lambda q: not q.lot_id)
