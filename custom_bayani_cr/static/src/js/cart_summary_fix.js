@@ -1,6 +1,17 @@
+/** @odoo-module **/
 // Fix for cart summary innerHTML error
 // This directly patches the _updateCartSummary method to safely handle null elements
 // Only applies on checkout/cart pages to avoid interfering with login and other pages
+
+// Define as a module but don't require any dependencies
+odoo.define('custom_bayani_cr.cart_summary_fix', function(require) {
+    'use strict';
+    
+    // No dependencies required - this is a standalone fix
+    return {};
+});
+
+// Execute the fix immediately
 (function() {
     'use strict';
 
