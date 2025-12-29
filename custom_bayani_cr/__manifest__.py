@@ -7,12 +7,11 @@
     'author': "Candidroot Solutions Pvt. Ltd.",
     'description': """This module helps to Hide the price,Cart Button and quantity of the product if user is not login.""",
     'sequence': 8,
-    'depends': ['website_sale', 'website_sale_wishlist', 'product_expiry', 'stock', 'website', 'sale', 'sale_management'],
+    'depends': ['website_sale', 'website_sale_wishlist', 'product_expiry', 'stock', 'website', 'sale'],
     'data': [
         'data/contact_tag.xml',
         'views/product_category.xml',
         'views/sale_order_line_view.xml',
-        'views/sale_order_hide_options.xml',
         'views/website_template_inherit.xml',
         'views/res_config_view.xml',
         'views/web_client_template.xml',
@@ -27,7 +26,6 @@
             'custom_bayani_cr/static/src/scss/product_page.scss',
             # 'custom_bayani_cr/static/src/scss/report.scss',
             'custom_bayani_cr/static/src/js/custom_qty_selection.js',
-            'custom_bayani_cr/static/src/js/cart_summary_fix.js',
         ],
         'web.report_assets_common': [
             'custom_bayani_cr/static/src/web_client/layout_boxed.scss',
