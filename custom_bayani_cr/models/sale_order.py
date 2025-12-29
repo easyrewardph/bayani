@@ -87,28 +87,20 @@ class SaleOrderLine(models.Model):
     custom_test_field = fields.Char(string="Test Field", compute='_compute_custom_test_field')
 
     def _clean_option_lines(self, name_text):
-        """Helper method to remove option lines and original_focus_keyword from name."""
+        """Helper method to remove option lines from name."""
         if not name_text:
             return name_text
         lines = name_text.split('\n')
         filtered_lines = [
             l for l in lines 
             if not re.match(r'^\s*Option(\s+for)?\s*:', l, re.IGNORECASE)
-            and 'original_focus_keyword' not in l.lower()
         ]
-        result = '\n'.join(filtered_lines)
-        # Remove any occurrence of original_focus_keyword and its value from the text
-        # Pattern: original_focus_keyword: value or original_focus_keyword = value or just original_focus_keyword
-        result = re.sub(r'original_focus_keyword\s*[:=]\s*[^\n]*', '', result, flags=re.IGNORECASE)
-        result = re.sub(r'\boriginal_focus_keyword\b\s*', '', result, flags=re.IGNORECASE)
-        # Clean up any double newlines that might have been created
-        result = re.sub(r'\n\n+', '\n', result)
-        return result.strip()
+        return '\n'.join(filtered_lines)
 
     @api.depends('product_id', 'product_uom', 'product_uom_qty')
     def _compute_name(self):
         """Override to remove 'Option:' and 'Option for:' prefixes from the description."""
-        super()._compute_name()git
+        super()._compute_name()
         for line in self:
             if line.name:
                 line.name = self._clean_option_lines(line.name)
