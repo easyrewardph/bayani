@@ -1,7 +1,7 @@
 /** @odoo-module **/
 
 import { patch } from "@web/core/utils/patch";
-import { PickingController } from "@stock_barcode/views/client_action/picking_client_action";
+import { PickingController } from "@stock_barcode/js/client_action/picking_client_action";
 import { _t } from "@web/core/l10n/translation";
 import { ConfirmationDialog } from "@web/core/confirmation_dialog/confirmation_dialog";
 
