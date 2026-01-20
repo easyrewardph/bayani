@@ -1,11 +1,11 @@
 /** @odoo-module **/
 
 import { patch } from "@web/core/utils/patch";
-import { PickingController } from "@stock_barcode/static/src/client_action/picking_client_action";
+import BarcodePickingModel from "@stock_barcode/models/barcode_picking_model";
 import { _t } from "@web/core/l10n/translation";
 import { ConfirmationDialog } from "@web/core/confirmation_dialog/confirmation_dialog";
 
-patch(PickingController.prototype, {
+patch(BarcodePickingModel.prototype, {
     /**
      * @override
      */
