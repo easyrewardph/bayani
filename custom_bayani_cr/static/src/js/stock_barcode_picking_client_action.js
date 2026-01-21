@@ -10,71 +10,87 @@ patch(BarcodePickingModel.prototype, {
      * @override
      */
     async _onBarcodeScanned(barcode) {
-        const result = await this.model.cache.getRecordByBarcode(barcode);
+        const result = await this.cache.getRecordByBarcode(barcode);
         
         if (result && result.record) {
             const { record, type } = result;
 
+            // Scenario 1: Location scan validation
             if (record._name === 'stock.location' || type === 'location') {
-                 if (!this._isValidLocation(record)) {
-                      this.env.services.dialog.add(ConfirmationDialog, {
-                          title: _t("Wrong location"),
-                          body: _t("The scanned location is not in the active picking list."),
-                          confirm: () => {},
-                          cancel: () => {},
-                          confirmLabel: _t("Ok"),
-                          cancelLabel: "", // Hide cancel
-                      });
-                      return; // Block execution
-                 }
-                 this.currentLocationId = record.id;
-            } else if (record._name === 'stock.lot' || type === 'lot') {
-                 if (this.currentLocationId) {
-                      if (!this._isValidLot(record)) {
-                           this.env.services.dialog.add(ConfirmationDialog, {
-                               title: _t("Wrong barcode"),
-                               body: _t("The scanned lot does not belong to the selected location."),
-                               confirm: () => {},
-                               cancel: () => {},
-                               confirmLabel: _t("Ok"),
-                               cancelLabel: "", // Hide cancel
-                           });
-                           return; // Block execution
-                      }
-                 }
+                if (!this._isValidLocation(record)) {
+                    this.env.services.dialog.add(ConfirmationDialog, {
+                        title: _t("Invalid Location"),
+                        body: _t("Location does not exist on this picking slip."),
+                        confirm: () => {},
+                        confirmLabel: _t("OK"),
+                        cancel: false,
+                    });
+                    return; // Reject the scan completely
+                }
+                // Valid location - store it and allow scan
+                this.currentLocationId = record.id;
+                return super._onBarcodeScanned(barcode);
+            }
+
+            // Scenario 2: Product/Lot barcode validation
+            // Check if this is a product or lot scan
+            if (record._name === 'stock.lot' || type === 'lot' || 
+                record._name === 'product.product' || type === 'product') {
+                
+                // If we have a current location, validate the barcode is reserved in that location
+                if (this.currentLocationId) {
+                    if (!this._isBarcodeInLocation(record, this.currentLocationId)) {
+                        this.env.services.dialog.add(ConfirmationDialog, {
+                            title: _t("Invalid Barcode"),
+                            body: _t("This barcode isn't reserved in this location."),
+                            confirm: () => {},
+                            confirmLabel: _t("OK"),
+                            cancel: false,
+                        });
+                        return; // Reject the scan completely
+                    }
+                }
             }
         }
         
+        // If all validations pass, proceed with normal scan
         return super._onBarcodeScanned(barcode);
     },
 
     _isValidLocation(location) {
-        // Check if the location is present in the current picking lines
-        const lines = this.model.pageLines || this.model.lines || [];
-        return lines.some(l => {
-            const lineLocId = Array.isArray(l.location_id) ? l.location_id[0] : l.location_id;
+        // Check if the location exists in any line of the current picking
+        const lines = this.pageLines || this.lines || [];
+        return lines.some(line => {
+            const lineLocId = Array.isArray(line.location_id) ? line.location_id[0] : line.location_id;
             return lineLocId === location.id;
         });
     },
 
-    _isValidLot(lot) {
-        // Check if the lot is valid for the current location
-        // If no location has been scanned yet (currentLocationId is null), we might want to allow 
-        // logic depends on strictness, but prompt implies "once correct location is scanned".
-        // If they scan lot without location, the original flow (super) will likely handle it or suggest a default.
-        // Here we strictly check: IF we possess a currentLocationId, the lot MUST match it.
-        const lines = this.model.pageLines || this.model.lines || [];
-        return lines.some(l => {
-            const lineLocId = Array.isArray(l.location_id) ? l.location_id[0] : l.location_id;
-            const lineLotId = Array.isArray(l.lot_id) ? l.lot_id[0] : l.lot_id;
-            // Case 1: Active location scan mode check
-            if (this.currentLocationId) {
-                return lineLocId === this.currentLocationId && lineLotId === lot.id;
+    _isBarcodeInLocation(record, locationId) {
+        // Check if the scanned barcode (product or lot) is reserved in the specified location
+        const lines = this.pageLines || this.lines || [];
+        
+        return lines.some(line => {
+            const lineLocId = Array.isArray(line.location_id) ? line.location_id[0] : line.location_id;
+            
+            // Must be in the correct location
+            if (lineLocId !== locationId) {
+                return false;
             }
-            // Case 2: Just checking if lot exists in picking at all (if we wanted loose check)
-            // But requirement says: "check the picking to see if thats lot barcode is on the picking list IN THAT LOCATION"
-            // So this function is called inside `if (this.currentLocationId)` logic in _onBarcodeScanned.
-            return lineLotId === lot.id; 
+            
+            // Check if it's a lot barcode
+            if (record._name === 'stock.lot') {
+                const lineLotId = Array.isArray(line.lot_id) ? line.lot_id[0] : line.lot_id;
+                return lineLotId === record.id;
+            }
+            
+            // Check if it's a product barcode
+            if (record._name === 'product.product') {
+                const lineProductId = Array.isArray(line.product_id) ? line.product_id[0] : line.product_id;
+                return lineProductId === record.id;
+            }
+            
+            return false;
         });
     }
 });
