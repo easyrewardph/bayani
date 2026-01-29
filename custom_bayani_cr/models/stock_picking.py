@@ -8,6 +8,8 @@ _logger = logging.getLogger(__name__)
 class StockPicking(models.Model):
     _inherit = 'stock.picking'
 
+    audit_log_ids = fields.One2many('stock.picking.log', 'picking_id', string='Audit Logs')
+
     @api.model
     def action_log_scan_event(self, barcode, status, message):
         """
@@ -118,4 +120,94 @@ class StockPicking(models.Model):
             'line_id': line_to_update.id,
             'new_qty_done': line_to_update.qty_done
         }
+
+    @api.model
+    def get_picking_snapshot(self, picking_id):
+        """
+        Return a complete snapshot of the picking for local validation.
+        Includes real-time stock availability check.
+        """
+        picking = self.browse(picking_id)
+        if not picking.exists():
+            return {'status': 'error', 'message': 'Picking not found'}
+            
+        snapshot = {
+            'id': picking.id,
+            'name': picking.name,
+            'location_id': picking.location_id.id,
+            'location_name': picking.location_id.display_name,
+            'picking_type_code': picking.picking_type_id.code,
+            'lines': []
+        }
+        
+        # Aggregate lines by product/lot to check strict availability
+        for line in picking.move_line_ids:
+            # Check real-time availability at source location
+            quant = self.env['stock.quant'].search([
+                ('location_id', '=', line.location_id.id),
+                ('product_id', '=', line.product_id.id),
+                ('lot_id', '=', line.lot_id.id) if line.lot_id else (1, '=', 1)
+            ], limit=1)
+            
+            # Sum up quantity if multiple quants exist
+            # Better approach for availability:
+            domain = [
+                ('location_id', '=', line.location_id.id),
+                ('product_id', '=', line.product_id.id),
+            ]
+            if line.lot_id:
+                domain.append(('lot_id', '=', line.lot_id.id))
+            
+            quants = self.env['stock.quant'].search(domain)
+            available_qty = sum(quants.mapped('quantity'))
+            
+            line_data = {
+                'id': line.id,
+                'product_id': line.product_id.id,
+                'product_barcode': line.product_id.barcode,
+                'product_name': line.product_id.display_name,
+                'lot_id': line.lot_id.id or False,
+                'lot_name': line.lot_id.name or False,
+                'qty_reserved': line.reserved_uom_qty, # This is the "Required" for this specific move line
+                'qty_done': line.qty_done,
+                'location_id': line.location_id.id, # Expected Source
+                'location_name': line.location_id.display_name,
+                'available_qty_at_source': available_qty,
+                'state': line.state,
+            }
+            snapshot['lines'].append(line_data)
+            
+        return {'status': 'success', 'data': snapshot}
+
+    @api.model
+    def process_offline_scans(self, picking_id, scans):
+        """
+        Process a batch of offline scans.
+        scans: list of { 'barcode': str, 'location_id': int, 'timestamp': str, 'qty': float, 'scan_id': str (optional) }
+        """
+        picking = self.browse(picking_id)
+        if not picking.exists():
+            return {'status': 'error', 'message': 'Picking not found'}
+
+        results = []
+        for scan in scans:
+            try:
+                # Reuse strict logic or call standard process
+                # We reuse action_scan_product_strict as it encapsulates our validation logic
+                res = self.action_scan_product_strict(picking.id, scan['barcode'], scan.get('location_id'))
+                results.append({
+                    'scan_id': scan.get('scan_id'),
+                    'barcode': scan['barcode'], 
+                    'status': res.get('status'), 
+                    'message': res.get('message')
+                })
+            except Exception as e:
+                results.append({
+                    'scan_id': scan.get('scan_id'),
+                    'barcode': scan['barcode'], 
+                    'status': 'error', 
+                    'message': str(e)
+                })
+        
+        return {'status': 'success', 'results': results}
 
