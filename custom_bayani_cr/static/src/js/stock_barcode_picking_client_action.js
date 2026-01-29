@@ -324,7 +324,7 @@ patch(BarcodePickingModel.prototype, {
         // We can check if the Product matches a known Lot in our snapshot or if the scan *is* a Lot.
         // If it sends a Product GTIN only, and the product requires Lots, and we don't have it...
         // Odoo natively handles this by asking for Lot. 
-        // Requirement: "Block the scan: INCOMPLETE PRODUCT DATA ... No lot/serial info found".
+        // Requirement: "Block the scan: INCOMPLETE PRODUCT DATA ... No lot/serial information found".
         // This suggests: if the barcode system doesn't resolve a lot (just a product), we block.
         // This effectively forces Lot Scans.
         
@@ -431,6 +431,7 @@ patch(BarcodePickingModel.prototype, {
                  
                  // Record Scan Locally First (Optimistic Update)
                  const scanEntry = {
+                    scan_id: Date.now().toString() + Math.random().toString(36).substring(7), // Unique ID
                     barcode,
                     location_id: this.currentLocationId,
                     timestamp: new Date().toISOString(),
@@ -448,14 +449,21 @@ patch(BarcodePickingModel.prototype, {
                          this.env.services.notification.add(res.message, { type: 'success' });
                          await this.trigger('reload');
                          // Mark synced
-                         const lastScan = this.bayaniSession.scans.find(s => s === scanEntry);
-                         if (lastScan) lastScan.synced = true;
+                         const lastScan = this.bayaniSession.scans.find(s => s.scan_id === scanEntry.scan_id);
+                         if (lastScan) {
+                            lastScan.synced = true;
+                            lastScan.lastSyncStatus = 'success';
+                         }
                          await this._bayaniSaveSession();
                      } else {
                          this._bayaniShowError("Invalid Item", res.message);
-                         // Rollback local scan?
-                         // If server rejected it as invalid, we should remove it from session
-                         this.bayaniSession.scans = this.bayaniSession.scans.filter(s => s !== scanEntry);
+                         // Update local status to reflect rejection
+                         const lastScan = this.bayaniSession.scans.find(s => s.scan_id === scanEntry.scan_id);
+                         if (lastScan) {
+                             lastScan.synced = true; // Mark as "processed" but failed
+                             lastScan.lastSyncStatus = 'failed';
+                             lastScan.error = res.message;
+                         }
                          await this._bayaniSaveSession();
                      }
                  } catch (e) {

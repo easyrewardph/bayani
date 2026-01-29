@@ -181,7 +181,7 @@ class StockPicking(models.Model):
     def process_offline_scans(self, picking_id, scans):
         """
         Process a batch of offline scans.
-        scans: list of { 'barcode': str, 'location_id': int, 'timestamp': str, 'qty': float }
+        scans: list of { 'barcode': str, 'location_id': int, 'timestamp': str, 'qty': float, 'scan_id': str (optional) }
         """
         picking = self.browse(picking_id)
         if not picking.exists():
@@ -194,12 +194,18 @@ class StockPicking(models.Model):
                 # We reuse action_scan_product_strict as it encapsulates our validation logic
                 res = self.action_scan_product_strict(picking.id, scan['barcode'], scan.get('location_id'))
                 results.append({
+                    'scan_id': scan.get('scan_id'),
                     'barcode': scan['barcode'], 
                     'status': res.get('status'), 
                     'message': res.get('message')
                 })
             except Exception as e:
-                results.append({'barcode': scan['barcode'], 'status': 'error', 'message': str(e)})
+                results.append({
+                    'scan_id': scan.get('scan_id'),
+                    'barcode': scan['barcode'], 
+                    'status': 'error', 
+                    'message': str(e)
+                })
         
         return {'status': 'success', 'results': results}
 
