@@ -384,6 +384,7 @@ patch(BarcodePickingModel.prototype, {
                  // If lines have different sources, we valid per line.
                  // But for "Context Lock", usually we scan location then products.
                  
+                 if (this.currentLocationId && this.currentLocationId !== record.id) {
                      // Locked
                      this._bayaniLog('validation_fail', barcode, 'wrong_location', `Linked to ${this.currentLocationId}`);
                      this._bayaniShowError("WRONG LOCATION", `Detailed: Linked to ${this.currentLocationId}`);

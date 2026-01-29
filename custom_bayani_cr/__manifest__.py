@@ -31,7 +31,7 @@
         ],
         'web.assets_backend': [
              'custom_bayani_cr/static/src/js/stock_barcode_picking_client_action.js',
-             # 'custom_bayani_cr/static/src/xml/stock_barcode_line.xml',
+             'custom_bayani_cr/static/src/xml/stock_barcode_line.xml',
         ],
         'web.report_assets_common': [
             'custom_bayani_cr/static/src/web_client/layout_boxed.scss',
