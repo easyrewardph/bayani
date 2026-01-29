@@ -475,6 +475,9 @@ patch(BarcodePickingModel.prototype, {
         } else {
             this._bayaniShowError("Unknown Barcode", "Barcode not found in database.");
         }
+        
+        // If all validations pass (or no location locked), proceed with normal scan
+        return super._onBarcodeScanned(barcode);
     },
 
     validScan(barcode) {
