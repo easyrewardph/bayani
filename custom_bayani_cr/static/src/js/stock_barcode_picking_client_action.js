@@ -6,18 +6,18 @@ import { _t } from "@web/core/l10n/translation";
 import { ConfirmationDialog } from "@web/core/confirmation_dialog/confirmation_dialog";
 
 patch(BarcodePickingModel.prototype, {
-    setup() {
-        super.setup(...arguments);
-        this.bayaniSnapshot = null;
-        this.bayaniSession = null;
-        this.encryptionKey = null;
-        this._setupSyncService();
-    },
+    // setup() removed as BarcodePickingModel is not a Component
+
 
     /**
      * @override
      */
      async load() {
+        this.bayaniSnapshot = null;
+        this.bayaniSession = null;
+        this.encryptionKey = null;
+        this._setupSyncService();
+
         await this._initEncryption();
         await super.load(...arguments);
         await this._bayaniInitialize();
