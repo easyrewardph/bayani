@@ -501,6 +501,17 @@
             </xpath>
         </template>
 
+        <!-- Fix for l10n_au.report_invoice_document XPath error -->
+        <!-- This template overrides the Australian localization template to prevent XPath errors -->
+        <template id="report_invoice_document_au_fix" inherit_id="l10n_au.report_invoice_document" active="True" priority="99">
+            <!-- Override the problematic XPath expression with an empty operation -->
+            <!-- The l10n_au template tries to access elements that don't exist in our custom template -->
+            <xpath expr="//div[hasclass('page')]/t[@t-set='layout_document_title']" position="replace">
+                <!-- Empty replacement to prevent the XPath error -->
+                <!-- Our custom template already handles all necessary invoice formatting -->
+            </xpath>
+        </template>
+
 
         <!--        SALE ORDER-->
         <template id="report_saleorder_document_custom" inherit_id="sale.report_saleorder_document">
