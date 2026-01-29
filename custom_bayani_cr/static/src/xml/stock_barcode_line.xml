@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-inherit="stock_barcode.LineComponent" t-inherit-mode="extension">
+        <xpath expr="//div[hasclass('o_barcode_line_details')]" position="inside">
+            <div class="o_bayani_extended_info text-info small">
+                 <div t-if="line.bayani_last_scan">
+                     <i class="fa fa-clock-o me-1"/> <t t-esc="line.bayani_last_scan"/>
+                 </div>
+                 <div t-if="line.lot_name">
+                     <i class="fa fa-barcode me-1"/> <t t-esc="line.lot_name"/> <span class="badge rounded-pill bg-success" t-if="line.product_id.tracking != 'none'">Confirmed</span>
+                 </div>
+                 <div>
+                     Qty: <t t-esc="line.qty_done"/> / <t t-esc="line.qty_reserved"/>
+                 </div>
+            </div>
+        </xpath>
+    </t>
+</templates>

@@ -8,6 +8,8 @@ _logger = logging.getLogger(__name__)
 class StockPicking(models.Model):
     _inherit = 'stock.picking'
 
+    audit_log_ids = fields.One2many('stock.picking.log', 'picking_id', string='Audit Logs')
+
     @api.model
     def action_log_scan_event(self, barcode, status, message):
         """

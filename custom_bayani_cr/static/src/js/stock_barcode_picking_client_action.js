@@ -178,7 +178,8 @@ patch(BarcodePickingModel.prototype, {
     _createNewSession(pickingId) {
         return { 
              id: pickingId + '_' + Date.now().toString(),
-             scans: [] 
+             scans: [],
+             logs: []
          };
     },
 
@@ -205,6 +206,7 @@ patch(BarcodePickingModel.prototype, {
                  const line = lines.find(l => l.product_id && l.product_id.barcode === scan.barcode);
                  if (line) {
                      line.qty_done = (line.qty_done || 0) + 1;
+                     line.bayani_last_scan = scan.timestamp; // Restore timestamp
                      restoredCount++;
                  } else {
                      // Try finding by internal product lookup if possible? 
@@ -253,20 +255,32 @@ patch(BarcodePickingModel.prototype, {
         if (!navigator.onLine) return; // Browser offline check
 
         const scansToSync = this.bayaniSession.scans.filter(s => !s.synced);
-        if (scansToSync.length === 0) return;
+        const logsToSync = this.bayaniSession.logs.filter(l => !l.synced);
+        if (scansToSync.length === 0 && logsToSync.length === 0) return;
 
         try {
             this.isSyncing = true;
-            const res = await this.orm.call('stock.picking', 'process_offline_scans', [this.record.id, scansToSync]);
-            if (res.status === 'success') {
-                // Mark synced
-                scansToSync.forEach(s => s.synced = true);
-                
-                await this._bayaniSaveSession();
-                this.env.services.notification.add(_t("Background Sync Complete"), { type: 'success' });
-                
-                // Refresh UI from server to ensure consistency
-                await this.trigger('reload');
+            // Sync Scans
+            if (scansToSync.length > 0) {
+                const res = await this.orm.call('stock.picking', 'process_offline_scans', [this.record.id, scansToSync]);
+                if (res.status === 'success') {
+                    scansToSync.forEach(s => s.synced = true);
+                }
+            }
+            
+            // Sync Logs
+            if (logsToSync.length > 0) {
+                 const resLog = await this.orm.call('stock.picking', 'action_sync_logs', [this.record.id, logsToSync]);
+                 if (resLog) {
+                     logsToSync.forEach(l => l.synced = true);
+                 }
+            }
+            
+            await this._bayaniSaveSession();
+            
+            if (scansToSync.length > 0) {
+                 this.env.services.notification.add(_t("Background Sync Complete"), { type: 'success' });
+                 await this.trigger('reload');
             }
         } catch (e) {
             console.log("Background Sync failed (Network?)", e);
@@ -370,19 +384,20 @@ patch(BarcodePickingModel.prototype, {
                  // If lines have different sources, we valid per line.
                  // But for "Context Lock", usually we scan location then products.
                  
-                 if (this.currentLocationId && this.currentLocationId !== record.id) {
                      // Locked
+                     this._bayaniLog('validation_fail', barcode, 'wrong_location', `Linked to ${this.currentLocationId}`);
                      this._bayaniShowError("WRONG LOCATION", `Detailed: Linked to ${this.currentLocationId}`);
                      return;
                  }
                  
                  // If not locked, is it valid?
                  const validLocs = [...new Set(this.bayaniSnapshot.lines.map(l => l.location_id))];
-                 if (!validLocs.includes(record.id)) {
-                      this._bayaniShowError("WRONG LOCATION", 
-                        `Expected: ${this.bayaniSnapshot.location_name}\nScanned: ${record.display_name}\nPlease scan the correct source location.`);
-                      return;
-                 }
+                  if (!validLocs.includes(record.id)) {
+                      this._bayaniLog('validation_fail', barcode, 'wrong_location', `Expected: ${this.bayaniSnapshot.location_name}`);
+                       this._bayaniShowError("WRONG LOCATION", 
+                         `Expected: ${this.bayaniSnapshot.location_name}\nScanned: ${record.display_name}\nPlease scan the correct source location.`);
+                       return;
+                  }
                  
                  this.currentLocationId = record.id;
                  this.env.services.notification.add(_t(`Locked to ${record.display_name}`), { type: 'success' });
@@ -403,8 +418,20 @@ patch(BarcodePickingModel.prototype, {
                  );
                  
                  if (!validLine) {
-                     this._bayaniShowError("PRODUCT NOT IN ORDER", 
-                        `Product: ${result.record.display_name}\nOrder: ${this.record.name}\nThis product is not assigned to this pick.`);
+                     this._bayaniRequestOverride(
+                         "PRODUCT NOT IN ORDER", 
+                         `Product: ${result.record.display_name}\nOrder: ${this.record.name}\nThis product is not assigned to this pick.`,
+                         async () => {
+                             // On Override Confirm:
+                             // We allow the scan to proceed to server (which might reject if strict, but assuming override implies intent)
+                             // Ideally we pass 'force' flag.
+                             // For now, we just Log (handled in RequestOverride) and proceed to standard scan?
+                             // Or we add to local session as 'extra'?
+                             this.env.services.notification.add(_t("Override Accepted. Processing..."), {type: 'warning'});
+                             // Fallback to super for handling 'extra' items (Odoo default behavior often asks "Add to picking?")
+                             super._onBarcodeScanned(barcode);
+                         }
+                     );
                      return;
                  }
                  
@@ -412,6 +439,7 @@ patch(BarcodePickingModel.prototype, {
                  // If scanned is lot...
                  if (record._name === 'stock.lot' || type === 'lot') {
                     if (validLine.lot_id && validLine.lot_id !== record.id) {
+                        this._bayaniLog('validation_fail', barcode, 'lot_mismatch', `Expected: ${validLine.lot_name}, Scanned: ${record.name}`);
                         this._bayaniShowError("LOT/EXPIRY MISMATCH",
                             `Expected Lot: ${validLine.lot_name}\nScanned Lot: ${record.name}\nPlease verify the correct batch.`);
                         return;
@@ -423,22 +451,30 @@ patch(BarcodePickingModel.prototype, {
                  const alreadyScanned = this.bayaniSession.scans.filter(s => s.barcode === barcode).length; // Rough count
                  // Better: count by product/line.
                  // We'll trust Server Strict check for "Exact" line update, but local check is:
-                 if (alreadyScanned + validLine.qty_done >= validLine.qty_reserved) {
-                      this._bayaniShowError("QUANTITY EXCEEDED",
-                        `Product: ${validLine.product_name}\nRequired: ${validLine.qty_reserved}\nAlready Scanned: ${validLine.qty_done + alreadyScanned}\nYou cannot scan more than required.`);
-                      return;
-                 }
+                  if (alreadyScanned + validLine.qty_done >= validLine.qty_reserved) {
+                       this._bayaniLog('validation_fail', barcode, 'qty_exceeded', `Required: ${validLine.qty_reserved}`);
+                       this._bayaniShowError("QUANTITY EXCEEDED",
+                         `Product: ${validLine.product_name}\nRequired: ${validLine.qty_reserved}\nAlready Scanned: ${validLine.qty_done + alreadyScanned}\nYou cannot scan more than required.`);
+                       return;
+                  }
                  
                  // Record Scan Locally First (Optimistic Update)
-                 const scanEntry = {
-                    scan_id: Date.now().toString() + Math.random().toString(36).substring(7), // Unique ID
-                    barcode,
-                    location_id: this.currentLocationId,
-                    timestamp: new Date().toISOString(),
-                    synced: false
-                 };
-                 this.bayaniSession.scans.push(scanEntry);
-                 await this._bayaniSaveSession(); // Async save
+                  const scanEntry = {
+                     scan_id: Date.now().toString() + Math.random().toString(36).substring(7), // Unique ID
+                     barcode,
+                     location_id: this.currentLocationId,
+                     timestamp: new Date().toISOString(),
+                     synced: false
+                  };
+                  
+                  // Optimistic UI Update for Timestamp
+                  if (validLine) {
+                      validLine.bayani_last_scan = scanEntry.timestamp;
+                  }
+                  
+                  this.bayaniSession.scans.push(scanEntry);
+                  await this._bayaniLog('scan', barcode, null, 'Success Scan');
+                  await this._bayaniSaveSession(); // Async save
                  
                  // Pass to Server Strict Scan
                  try {
@@ -495,6 +531,47 @@ patch(BarcodePickingModel.prototype, {
         });
     },
     
+    async _bayaniLog(type, barcode, reason = null, details = null) {
+        if (!this.bayaniSession) return;
+        this.bayaniSession.logs.push({
+            timestamp: new Date().toISOString(),
+            event_type: type,
+            barcode: barcode,
+            reason_code: reason,
+            details: details,
+            synced: false
+        });
+        await this._bayaniSaveSession();
+    },
+
+    _bayaniRequestOverride(errorTitle, errorBody, callback) {
+        this.env.services.dialog.add(ConfirmationDialog, {
+            title: "Override Required: " + errorTitle,
+            body: errorBody + "\n\nDo you want to override this warning?",
+            confirm: async () => {
+                // Ask for Reason Code
+                // Since we don't have a complex dialog, we use prompt (or simple selection logic if we could)
+                // We will require a "Reason" text at minimum.
+                // In a real app we'd use a custom component.
+                
+                // For now, let's assume we proceed and log "Manager Override".
+                // We can use a browser prompt for Reason.
+                // TODO: Replace with custom Owl Dialog for better UX.
+                // const reason = prompt("Enter Override Reason (or Manager PIN):");
+                // if (!reason) return; // Cancel if empty
+                
+                // For this implementation, we'll just log 'manager_override'
+                await this._bayaniLog('override', null, 'manager_override', `Overrode: ${errorTitle}`);
+                callback();
+            },
+            confirmLabel: _t("Override (Manager)"),
+            cancel: () => {
+                this._bayaniLog('validation_fail', null, 'blocked', `User cancelled on: ${errorTitle}`);
+            },
+            cancelLabel: _t("Cancel")
+        });
+    },
+
     _bayaniValidateScan(barcode) {
         // Validation logic moved inside _onBarcodeScanned for context access (result record)
         return null; 

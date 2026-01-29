@@ -9,6 +9,7 @@
     'sequence': 8,
     'depends': ['website_sale', 'website_sale_wishlist', 'product_expiry', 'stock', 'website', 'sale', 'stock_barcode'],
     'data': [
+        'security/ir.model.access.csv',
         'data/contact_tag.xml',
         'views/product_category.xml',
         'views/sale_order_line_view.xml',
@@ -20,6 +21,7 @@
         'views/website_menu.xml',
         # 'views/report_layout_extend.xml',
         'views/report_extend.xml',
+        'views/stock_picking_views.xml',
     ],
     'assets': {
         'web.assets_frontend': [
@@ -29,6 +31,7 @@
         ],
         'web.assets_backend': [
              'custom_bayani_cr/static/src/js/stock_barcode_picking_client_action.js',
+             'custom_bayani_cr/static/src/xml/stock_barcode_line.xml',
         ],
         'web.report_assets_common': [
             'custom_bayani_cr/static/src/web_client/layout_boxed.scss',
