@@ -107,7 +107,7 @@ patch(BarcodePickingModel.prototype, {
             if (result.status === 'success') {
                 this.bayaniSnapshot = result.data;
                 console.log("[Bayani] Snapshot Loaded:", this.bayaniSnapshot);
-                this.env.services.notification.add(_t("Bayani V6 Strict Active"), { type: 'success' });
+                this.env.services.notification.add(_t("Bayani V7 Strict Active"), { type: 'success' });
                 
                 // 2. Pre-Pick Validation (Blocking)
                 const blockage = this._bayaniCheckStockAvailability();
@@ -410,19 +410,29 @@ patch(BarcodePickingModel.prototype, {
                       }
                  }
                  
-                 // If we passed all checks, we proceed to process the scan ourselves.
-                 // We do NOT call super.scanBarcode because it might try to reopen dialogs.
-                 // We call our internal handler directly.
+                 // Internal Handler
                  return this._processValidScan(barcode, record, validLine);
              }
+             
+             // If record exists but is NOT Location/Product/Lot (e.g. Package)
+             // User requested strict rejection of anything not in list.
+             this._bayaniShowError("UNAUTHORIZED TYPE", "Scanned item type is not allowed in this strict mode.");
+             return; // BLOCK
         } else {
-            // Not in Cache -> Unauthorized
+            // result is null (Not in Cache)
+            
+            // EXCEPTION: Allow Odoo Commands (e.g. O-CMD.VALIDATE)
+            // Commands usually fail cache lookup. We must let them pass to super.
+            if (barcode && (barcode.startsWith("O-CMD") || barcode.startsWith("O-BTN"))) {
+                return super.scanBarcode(barcode);
+            }
+            
             this._bayaniShowError("UNAUTHORIZED ITEM", "Item not recognized or not in picking.");
             return; // BLOCK
         }
 
-        // Only call super for commands (if any) or unhandled types
-        return super.scanBarcode(barcode);
+        // UNREACHABLE (Filtered above) but strictly:
+        // return super.scanBarcode(barcode); 
     },
     
     // Internal handler for valid scans (replacing _onBarcodeScanned logic)
