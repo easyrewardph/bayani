@@ -1,4 +1,5 @@
 /** @odoo-module **/
+console.log("[Bayani] JS Module Loaded! If you see this, the file is being read.");
 
 import { patch } from "@web/core/utils/patch";
 import BarcodePickingModel from "@stock_barcode/models/barcode_picking_model";
@@ -13,6 +14,7 @@ patch(BarcodePickingModel.prototype, {
      * @override
      */
      async load() {
+        console.log("[Bayani] load() called");
         this.bayaniSnapshot = null;
         this.bayaniSession = null;
         this.encryptionKey = null;
@@ -20,6 +22,7 @@ patch(BarcodePickingModel.prototype, {
 
         await this._initEncryption();
         await super.load(...arguments);
+        console.log("[Bayani] super.load() finished");
         await this._bayaniInitialize();
     },
 
@@ -103,6 +106,8 @@ patch(BarcodePickingModel.prototype, {
             const result = await this.orm.call('stock.picking', 'get_picking_snapshot', [pickingId]);
             if (result.status === 'success') {
                 this.bayaniSnapshot = result.data;
+                console.log("[Bayani] Snapshot Loaded:", this.bayaniSnapshot);
+                this.env.services.notification.add(_t("Bayani Mode Active"), { type: 'success' });
                 
                 // 2. Pre-Pick Validation (Blocking)
                 const blockage = this._bayaniCheckStockAvailability();
@@ -293,6 +298,9 @@ patch(BarcodePickingModel.prototype, {
      * @override
      */
     async _onBarcodeScanned(barcode) {
+        console.log("[Bayani] Scan Event:", barcode);
+        console.log("[Bayani] Snapshot present?", !!this.bayaniSnapshot);
+
         // Strict Validation using Snapshot
         if (this.bayaniSnapshot) {
             const error = this._bayaniValidateScan(barcode);
@@ -343,6 +351,8 @@ patch(BarcodePickingModel.prototype, {
         // This effectively forces Lot Scans.
         
         const result = await this.cache.getRecordByBarcode(barcode);
+        console.log("[Bayani] Cache Lookup:", result);
+
         if (result && result.record && (result.record._name === 'product.product' || result.type === 'product')) {
             // If it's a product scan (not a lot scan)
             // And we assume strict Lot compliance:
@@ -413,25 +423,17 @@ patch(BarcodePickingModel.prototype, {
                       return;
                  }
                  
-                 // Validate Product/Lot against Snapshot
+                 // Validate Product/Lot against Snapshot - STRICT barcode match required
                  const validLine = this.bayaniSnapshot.lines.find(l => 
-                    (l.product_id === record.id || l.product_barcode === barcode) // Loose match
+                    l.product_barcode === barcode // Strict exact barcode match only
                  );
                  
                  if (!validLine) {
-                     this._bayaniRequestOverride(
-                         "PRODUCT NOT IN ORDER", 
-                         `Product: ${result.record.display_name}\nOrder: ${this.record.name}\nThis product is not assigned to this pick.`,
-                         async () => {
-                             // On Override Confirm:
-                             // We allow the scan to proceed to server (which might reject if strict, but assuming override implies intent)
-                             // Ideally we pass 'force' flag.
-                             // For now, we just Log (handled in RequestOverride) and proceed to standard scan?
-                             // Or we add to local session as 'extra'?
-                             this.env.services.notification.add(_t("Override Accepted. Processing..."), {type: 'warning'});
-                             // Fallback to super for handling 'extra' items (Odoo default behavior often asks "Add to picking?")
-                             super._onBarcodeScanned(barcode);
-                         }
+                     // STRICT: No override option - block immediately
+                     this._bayaniLog('validation_fail', barcode, 'unauthorized_product', `Product: ${result.record.display_name}, Order: ${this.record.name}`);
+                     this._bayaniShowError(
+                         "UNAUTHORIZED PRODUCT", 
+                         `Product: ${result.record.display_name}\nOrder: ${this.record.name}\n\nThis product is not assigned to this pick and cannot be added. No override available.`
                      );
                      return;
                  }
@@ -483,7 +485,9 @@ patch(BarcodePickingModel.prototype, {
                         [this.record.id, barcode, this.currentLocationId]);
                      
                      if (res.status === 'success') {
-                         this.env.services.notification.add(res.message, { type: 'success' });
+                         const details = res.details || {};
+                         const successMsg = `${res.message}\nRemaining: ${details.remaining || 0}`;
+                         this.env.services.notification.add(successMsg, { type: 'success' });
                          await this.trigger('reload');
                          // Mark synced
                          const lastScan = this.bayaniSession.scans.find(s => s.scan_id === scanEntry.scan_id);
@@ -493,13 +497,22 @@ patch(BarcodePickingModel.prototype, {
                          }
                          await this._bayaniSaveSession();
                      } else {
-                         this._bayaniShowError("Invalid Item", res.message);
-                         // Update local status to reflect rejection
+                         // Enhanced error display with error code and details
+                         const errorCode = res.error_code || 'UNKNOWN_ERROR';
+                         const details = res.details || {};
+                         const errorTitle = this._getErrorTitle(errorCode);
+                         const errorBody = this._formatErrorDetails(errorCode, res.message, details);
+                         
+                         this._bayaniShowError(errorTitle, errorBody);
+                         
+                         // Update local status to reflect rejection with full details
                          const lastScan = this.bayaniSession.scans.find(s => s.scan_id === scanEntry.scan_id);
                          if (lastScan) {
                              lastScan.synced = true; // Mark as "processed" but failed
                              lastScan.lastSyncStatus = 'failed';
+                             lastScan.error_code = errorCode;
                              lastScan.error = res.message;
+                             lastScan.error_details = details;
                          }
                          await this._bayaniSaveSession();
                      }
@@ -530,6 +543,73 @@ patch(BarcodePickingModel.prototype, {
             confirmLabel: _t("OK"),
             cancel: false,
         });
+    },
+
+    _getErrorTitle(errorCode) {
+        const titles = {
+            'BARCODE_NOT_FOUND': 'BARCODE NOT RECOGNIZED',
+            'PRODUCT_NOT_IN_PICKING': 'UNAUTHORIZED PRODUCT',
+            'LOCATION_INVALID': 'WRONG LOCATION',
+            'LOT_MISMATCH': 'LOT/BATCH MISMATCH',
+            'LOT_REQUIRED': 'LOT SCAN REQUIRED',
+            'QUANTITY_EXCEEDED': 'QUANTITY EXCEEDED',
+            'PICKING_NOT_FOUND': 'TRANSFER NOT FOUND',
+        };
+        return titles[errorCode] || 'VALIDATION ERROR';
+    },
+
+    _formatErrorDetails(errorCode, message, details) {
+        let body = `Error Code: ${errorCode}\n\n${message}\n`;
+        
+        switch (errorCode) {
+            case 'BARCODE_NOT_FOUND':
+                body += `\nBarcode: ${details.barcode || 'N/A'}`;
+                body += `\nSearched in: ${(details.searched_in || []).join(', ')}`;
+                break;
+                
+            case 'PRODUCT_NOT_IN_PICKING':
+                body += `\nScanned Product: ${details.product_name || 'N/A'}`;
+                body += `\nPicking: ${details.picking_name || 'N/A'}`;
+                if (details.expected_products && details.expected_products.length > 0) {
+                    body += `\n\nExpected Products:\n- ${details.expected_products.slice(0, 5).join('\n- ')}`;
+                    if (details.expected_products.length > 5) {
+                        body += `\n  ...and ${details.expected_products.length - 5} more`;
+                    }
+                }
+                break;
+                
+            case 'LOCATION_INVALID':
+                body += `\nScanned Location: ${details.scanned_location || 'N/A'}`;
+                body += `\nExpected Location(s): ${(details.expected_locations || []).join(', ')}`;
+                break;
+                
+            case 'LOT_MISMATCH':
+                body += `\nScanned Lot: ${details.scanned_lot || details.expected_lot || 'N/A'}`;
+                body += `\nExpected Lot(s): ${(details.expected_lots || details.actual_lots || []).join(', ')}`;
+                break;
+                
+            case 'LOT_REQUIRED':
+                body += `\nProduct: ${details.product_name || 'N/A'}`;
+                body += `\nTracking Type: ${details.tracking_type || 'N/A'}`;
+                body += `\n\nPlease scan the lot/serial barcode instead of product barcode.`;
+                break;
+                
+            case 'QUANTITY_EXCEEDED':
+                body += `\nProduct: ${details.product_name || 'N/A'}`;
+                body += `\nTotal Reserved: ${details.total_reserved || 0}`;
+                body += `\nAlready Scanned: ${details.total_scanned || 0}`;
+                if (details.lot_name) {
+                    body += `\nLot: ${details.lot_name}`;
+                }
+                break;
+                
+            default:
+                // Show raw details for unknown errors
+                body += `\nDetails: ${JSON.stringify(details, null, 2)}`;
+        }
+        
+        body += `\n\n⚠️ This scan has been REJECTED. No quantity was added.`;
+        return body;
     },
     
     async _bayaniLog(type, barcode, reason = null, details = null) {
