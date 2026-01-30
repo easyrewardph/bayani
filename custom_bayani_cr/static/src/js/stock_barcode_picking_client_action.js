@@ -107,7 +107,7 @@ patch(BarcodePickingModel.prototype, {
             if (result.status === 'success') {
                 this.bayaniSnapshot = result.data;
                 console.log("[Bayani] Snapshot Loaded:", this.bayaniSnapshot);
-                this.env.services.notification.add(_t("Bayani V5 Strict Active"), { type: 'success' });
+                this.env.services.notification.add(_t("Bayani V6 Strict Active"), { type: 'success' });
                 
                 // 2. Pre-Pick Validation (Blocking)
                 const blockage = this._bayaniCheckStockAvailability();
@@ -627,47 +627,3 @@ patch(BarcodePickingModel.prototype, {
     }
 });
 
-import { StockBarcodeClientAction } from "@stock_barcode/stock_barcode_client_action";
-
-// -------------------------------------------------------------------------
-// CONTROLLER PATCH (Ultimate Guard)
-// -------------------------------------------------------------------------
-patch(StockBarcodeClientAction.prototype, {
-    async _onBarcodeScanned(barcode) {
-        // Sanitize Input (again, just in case)
-        if (typeof barcode === 'string') {
-            barcode = barcode.replace(/\0/g, '').trim();
-        }
-
-        // STRICT INTERCEPTION: Check if Model has Bayani Snapshot
-        // If so, we let the Model handle it and BLOCK default controller logic if needed.
-        if (this.model && this.model.bayaniSnapshot) {
-             console.log("[Bayani Controller] Intercepting:", barcode);
-             
-             // Delegate to Model's strict scanBarcode logic
-             // If model.scanBarcode handles strictly, it returns/resolves.
-             // BUT standard controller calls this.model.scanBarcode(barcode).
-             // If model returns undefined or false?
-             // Standard controller: `await this.model.scanBarcode(barcode);`
-             // Then it might do other things? No, usually just that.
-             
-             // However, `scanBarcode` in Model (which we patched) calls `super.scanBarcode` at the end
-             // if it didn't block.
-             
-             // If we want to accept "Commands" (like settings), we should let them pass.
-             // Commands usually start with "O-CMD".
-             if (barcode.startsWith("O-CMD")) {
-                 return super._onBarcodeScanned(barcode);
-             }
-             
-             // For strict mode, we call our Model patch.
-             // If model.scanBarcode throws/rejects, we catch it?
-             // Our Model patch returns void if blocked.
-             
-             await this.model.scanBarcode(barcode);
-             return; // STOP CONTROLLER from doing anything else (like default beeps or side effects)
-        }
-        
-        return super._onBarcodeScanned(barcode);
-    }
-});
