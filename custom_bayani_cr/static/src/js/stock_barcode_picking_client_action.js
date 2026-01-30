@@ -107,7 +107,7 @@ patch(BarcodePickingModel.prototype, {
             if (result.status === 'success') {
                 this.bayaniSnapshot = result.data;
                 console.log("[Bayani] Snapshot Loaded:", this.bayaniSnapshot);
-                this.env.services.notification.add(_t("Bayani Mode Active"), { type: 'success' });
+                this.env.services.notification.add(_t("Bayani V5 Strict Active"), { type: 'success' });
                 
                 // 2. Pre-Pick Validation (Blocking)
                 const blockage = this._bayaniCheckStockAvailability();
@@ -297,215 +297,200 @@ patch(BarcodePickingModel.prototype, {
     /**
      * @override
      */
-    async _onBarcodeScanned(barcode) {
-        console.log("[Bayani] Scan Event:", barcode);
-        console.log("[Bayani] Snapshot present?", !!this.bayaniSnapshot);
-
-        // 1. Snapshot Requirement (Strict Block)
+    // -------------------------------------------------------------------------
+    // STRICT ENTRY POINT OVERRIDE
+    // -------------------------------------------------------------------------
+    
+    /**
+     * @override
+     * Intercepts the scan at the very beginning to ensure strict blocking.
+     */
+    async scanBarcode(barcode) {
+        // Sanitize Input: Remove NUL (0x00) and other non-printable control characters
+        // Some scanners send null bytes or special terminators that crash Odoo's SQL driver.
+        if (typeof barcode === 'string') {
+            barcode = barcode.replace(/\0/g, '').trim(); 
+        }
+        
+        console.log("[Bayani] STRICT SCAN ENTRY:", barcode);
+        
+        // 1. Snapshot Requirement
         if (!this.bayaniSnapshot) {
-            this._bayaniShowError("SYSTEM NOT READY", "Validation data not loaded. Please wait or reload.");
-            return;
+             this._bayaniShowError("SYSTEM NOT READY", "Validation data not loaded. Please reload.");
+             return; 
         }
 
-        // 2. Barcode Lookup (Local Cache)
+        // 2. Resolve Barcode Locally
         const result = await this.cache.getRecordByBarcode(barcode);
-        console.log("[Bayani] Cache Lookup:", result);
-
-        // 3. STRICT VALIDATION & HANDLING (No Fallback to Super for Products)
+        
+        // 3. Strict Validation Logic
         if (result && result.record) {
              const { record, type } = result;
-             
-             // A. Location Scan
+
+             // A. Location Scan -> Lock (Allowed)
              if (record._name === 'stock.location' || type === 'location') {
-                 // Validate Location
+                 // Check if valid source
                  const validLocs = [...new Set(this.bayaniSnapshot.lines.map(l => l.location_id))];
                  if (!validLocs.includes(record.id)) {
-                      this._bayaniLog('validation_fail', barcode, 'wrong_location', `Expected: ${this.bayaniSnapshot.location_name}`);
                       this._bayaniShowError("WRONG LOCATION", 
-                        `Expected: ${this.bayaniSnapshot.location_name}\nScanned: ${record.display_name}\nPlease scan the correct source location.`);
-                      return;
+                        `Expected: ${this.bayaniSnapshot.location_name}\nScanned: ${record.display_name}\n\nSTRICT RULE: You must scan the correct source location.`);
+                      return; // BLOCK
                  }
-                 
-                 // Lock Location
                  this.currentLocationId = record.id;
                  this.env.services.notification.add(_t(`Locked to ${record.display_name}`), { type: 'success' });
-                 return; // Handled locally, no super needed for just locking (unless Odoo needs it for state)
+                 return; // Handled
              }
              
              // B. Product/Lot Scan
              const isProductOrLot = record._name === 'stock.lot' || type === 'lot' || record._name === 'product.product' || type === 'product';
              if (isProductOrLot) {
-                 // B1. Location Lock Check
                  if (!this.currentLocationId) {
                       this._bayaniShowError("ACTION REQUIRED", "Please scan a destination location first.");
-                      return;
+                      return; // BLOCK
                  }
+
+                 // STRICT FILTERING
+                 // We must find a valid line in our snapshot that matches:
+                 // 1. The scanned product/lot
+                 // 2. The CURRENT locked location
                  
-                 // B2. Find Valid Line in Snapshot (Strict Match)
                  let validLine = null;
                  
-                  // If scanned record is a Lot, we MUST match a line expecting that LOT
                  if (record._name === 'stock.lot' || type === 'lot') {
-                     // Find line with matching Lot ID AND Location
                      validLine = this.bayaniSnapshot.lines.find(l => 
                          l.lot_id === record.id && 
                          l.location_id === this.currentLocationId
                      );
                      
                      if (!validLine) {
-                         // Check if it's the right product but WRONG lot
-                         const productLine = this.bayaniSnapshot.lines.find(l => l.product_id === record.product_id.id && l.location_id === this.currentLocationId);
-                         if (productLine) {
-                             this._bayaniShowError("LOT/BATCH MISMATCH", 
-                                 `Product: ${record.product_id.display_name}\n\nScanned Lot: ${record.name}\nExpected Lot: ${productLine.lot_name || 'Different Batch'}\n\nRejection: Wrong Batch.`);
+                         // Check if it's a valid lot but WRONG location
+                         const otherLocLine = this.bayaniSnapshot.lines.find(l => l.lot_id === record.id);
+                         if (otherLocLine) {
+                             this._bayaniShowError("WRONG LOCATION", `This item is in ${otherLocLine.location_name}, NOT here.`);
                          } else {
-                             // Wrong Product or Wrong Location completely
-                              this._bayaniShowError("INVALID ITEM", "Item not found in this location.");
+                             this._bayaniShowError("LOT MISMATCH", `Scanned Lot "${record.name}" is not in the pick list for this location.`);
                          }
-                         return; // BLOCK (Don't call super)
+                         return; // BLOCK
                      }
-                 } 
-                 // If scanned record is a Product
-                 else {
-                     // Find line with matching Product ID AND Location AND (No Lot Required OR Lot Requirement handled later?)
-                     // If product requires lot, scanning product barcode might be allowed if we prompt for lot.
-                     // But prompt says: "Strict... no phantom...".
-                     // If we scan product barcode for a lot-tracked item, Odoo usually asks for lot.
-                     // We need to match valid line first.
-                     
+                 } else {
+                     // Product Scan
                      validLine = this.bayaniSnapshot.lines.find(l => 
                          (l.product_id === record.id || l.product_barcode === barcode) && 
                          l.location_id === this.currentLocationId
                      );
                      
                      if (!validLine) {
-                          // Check if it exists in another location
+                          // Check if valid product but WRONG location
                           const otherLocLine = this.bayaniSnapshot.lines.find(l => (l.product_id === record.id || l.product_barcode === barcode));
                           if (otherLocLine) {
-                              this._bayaniShowError("WRONG LOCATION", `Item is in ${otherLocLine.location_name}, not here.`);
+                              this._bayaniShowError("WRONG LOCATION", `This product is in ${otherLocLine.location_name}, NOT here.`);
                           } else {
-                              this._bayaniShowError("UNAUTHORIZED PRODUCT", "Product not in picking.");
+                              this._bayaniShowError("UNAUTHORIZED PRODUCT", "Product not found in this picking.");
                           }
                           return; // BLOCK
                      }
                      
-                     // If matched, but line requires Lot and we scanned Product Barcode?
-                     // We should let it proceed IF we want to allow manual lot entry? 
-                     // But User says "Scanning product... validation...".
-                     // If strictly requiring Lot Scan, we should block Product Scan for Lot items?
-                     // "If a scanned GTIN does not return a linked lot... block".
+                     // Lot Requirement Check
                      if (record.tracking === 'lot' || record.tracking === 'serial') {
                           this._bayaniShowError("LOT SCAN REQUIRED", "This product is tracked. Please scan the specific Lot/Serial barcode.");
                           return; // BLOCK
                      }
                  }
-
-                 // B3. Quantity Check
-                 // Check local moves
-                 // Trust Strict Server Check for final say, but optimized local check:
-                 // Count local scans for this specific line/product/lot combination
-                 // Note: We might have multiple lines for same product/lot? (Snapshot aggregates? No, snapshot has lines).
                  
-                 // We don't track which line ID exactly in local Scan log, just barcode.
-                 // So we estimate usage.
-                 // Simplified: If Line has 0 remaining, block.
+                 // Quantity Check (Pre-Server)
                  if (validLine.qty_done >= validLine.qty_reserved) {
-                     // Check if there's another identical line with space?
-                     const anySpace = this.bayaniSnapshot.lines.some(l => 
-                        l.product_id === validLine.product_id && 
-                        l.location_id === validLine.location_id &&
-                        (l.lot_id === validLine.lot_id) &&
-                        l.qty_done < l.qty_reserved
-                     );
-                     
-                     if (!anySpace) {
-                          this._bayaniShowError("QUANTITY EXCEEDED", `All required quantity for ${validLine.product_name} is already scanned.`);
+                      // Check for ANY space in this location for this product/lot
+                      const remaining = this.bayaniSnapshot.lines
+                        .filter(l => l.product_id === validLine.product_id && l.location_id === this.currentLocationId && ((!l.lot_id) || l.lot_id === validLine.lot_id))
+                        .reduce((sum, l) => sum + (l.qty_reserved - l.qty_done), 0);
+                      
+                      if (remaining <= 0) {
+                          this._bayaniShowError("QUANTITY EXCEEDED", `Required quantity already scanned.`);
                           return; // BLOCK
-                     }
+                      }
                  }
-
-                 // B4. SUCCESS - Process Scan Locally & Server
-                 // Record Scan Locally First
-                  const scanEntry = {
-                     scan_id: Date.now().toString() + Math.random().toString(36).substring(7),
-                     barcode,
-                     location_id: this.currentLocationId,
-                     timestamp: new Date().toISOString(),
-                     synced: false
-                  };
-                  
-                  // Optimistic UI Update
-                  validLine.qty_done += 1; 
-                  validLine.bayani_last_scan = scanEntry.timestamp;
-                  this.bayaniSession.scans.push(scanEntry);
-                  await this._bayaniLog('scan', barcode, null, 'Success Scan');
-                  await this._bayaniSaveSession();
-                  this.trigger('update'); // Force UI redraw
-
-                 // Pass to Server Strict Scan directly
-                 try {
-                     // Pass Lot ID if found (record.id if lot) to strict server
-                     const expectedLotId = (record._name === 'stock.lot' || type === 'lot') ? record.id : null;
-                     
-                     const res = await this.orm.call('stock.picking', 'action_scan_product_strict', 
-                        [this.record.id, barcode, this.currentLocationId, expectedLotId]);
-                     
-                     if (res.status === 'success') {
-                         const details = res.details || {};
-                         const successMsg = `${res.message}\nRemaining: ${details.remaining || 0}`;
-                         this.env.services.notification.add(successMsg, { type: 'success' });
-                         
-                         // Mark synced
-                         const lastScan = this.bayaniSession.scans.find(s => s.scan_id === scanEntry.scan_id);
-                         if (lastScan) {
-                            lastScan.synced = true;
-                            lastScan.lastSyncStatus = 'success';
-                         }
-                         await this._bayaniSaveSession();
-                     } else {
-                         // Rollback optimistic update
-                         validLine.qty_done -= 1;
-                         
-                         // Error Display
-                         const errorCode = res.error_code || 'UNKNOWN_ERROR';
-                         const details = res.details || {};
-                         const errorTitle = this._getErrorTitle(errorCode);
-                         const errorBody = this._formatErrorDetails(errorCode, res.message, details);
-                         
-                         this._bayaniShowError(errorTitle, errorBody);
-                         
-                         // Update local status
-                         const lastScan = this.bayaniSession.scans.find(s => s.scan_id === scanEntry.scan_id);
-                         if (lastScan) {
-                             lastScan.synced = true; 
-                             lastScan.lastSyncStatus = 'failed';
-                             lastScan.error_code = errorCode;
-                             lastScan.error = res.message;
-                         }
-                         await this._bayaniSaveSession();
-                         this.trigger('update'); // Redraw rollback
-                     }
-                 } catch (e) {
-                     console.warn("Server unreachable, keeping scan in queue", e);
-                     this.env.services.notification.add("Offline: Scan Queued", { type: 'warning' });
-                 }
-                 return; // handled. DO NOT CALL SUPER.
+                 
+                 // If we passed all checks, we proceed to process the scan ourselves.
+                 // We do NOT call super.scanBarcode because it might try to reopen dialogs.
+                 // We call our internal handler directly.
+                 return this._processValidScan(barcode, record, validLine);
              }
-        } 
-        else {
-            // result is null -> Not in Cache -> Not in Picking
-            this._bayaniShowError("UNAUTHORIZED ITEM", "Item not found in this picking (not in database/cache).\n\nValues: " + barcode);
+        } else {
+            // Not in Cache -> Unauthorized
+            this._bayaniShowError("UNAUTHORIZED ITEM", "Item not recognized or not in picking.");
             return; // BLOCK
         }
-        
-        // Fallback for other barcodes (Commands? Operations?)
-        // If it's not a location, product, or lot, maybe it's a command?
-        // Let's allow super() only if we are sure it's not a product/lot scan we missed.
-        // But strict mode says: "Everything must be validated".
-        // If we missed it above, it's safer to block.
-        // But what about "Put in Pack" barcode?
-        // Commands usually start with "O-CMD".
-        
+
+        // Only call super for commands (if any) or unhandled types
+        return super.scanBarcode(barcode);
+    },
+    
+    // Internal handler for valid scans (replacing _onBarcodeScanned logic)
+    async _processValidScan(barcode, record, validLine) {
+          const scanEntry = {
+             scan_id: Date.now().toString() + Math.random().toString(36).substring(7),
+             barcode,
+             location_id: this.currentLocationId,
+             timestamp: new Date().toISOString(),
+             synced: false
+          };
+          
+          // Optimistic UI Update
+          validLine.qty_done += 1; 
+          validLine.bayani_last_scan = scanEntry.timestamp;
+          this.bayaniSession.scans.push(scanEntry);
+          await this._bayaniLog('scan', barcode, null, 'Success Scan');
+          await this._bayaniSaveSession();
+          this.trigger('update');
+
+         try {
+             const expectedLotId = (record._name === 'stock.lot' || record.type === 'lot') ? record.id : null;
+             const res = await this.orm.call('stock.picking', 'action_scan_product_strict', 
+                [this.record.id, barcode, this.currentLocationId, expectedLotId]);
+             
+             if (res.status === 'success') {
+                 const details = res.details || {};
+                 const successMsg = `${res.message}\nRemaining: ${details.remaining || 0}`;
+                 this.env.services.notification.add(successMsg, { type: 'success' });
+                 
+                 const lastScan = this.bayaniSession.scans.find(s => s.scan_id === scanEntry.scan_id);
+                 if (lastScan) {
+                    lastScan.synced = true;
+                    lastScan.lastSyncStatus = 'success';
+                 }
+                 await this._bayaniSaveSession();
+             } else {
+                 validLine.qty_done -= 1; // Rollback
+                 
+                 const errorCode = res.error_code || 'UNKNOWN_ERROR';
+                 const details = res.details || {};
+                 const errorTitle = this._getErrorTitle(errorCode);
+                 const errorBody = this._formatErrorDetails(errorCode, res.message, details);
+                 
+                 this._bayaniShowError(errorTitle, errorBody);
+                 
+                 const lastScan = this.bayaniSession.scans.find(s => s.scan_id === scanEntry.scan_id);
+                 if (lastScan) {
+                     lastScan.synced = true; 
+                     lastScan.lastSyncStatus = 'failed';
+                     lastScan.error_code = errorCode;
+                     lastScan.error = res.message;
+                 }
+                 await this._bayaniSaveSession();
+                 this.trigger('update');
+             }
+         } catch (e) {
+             console.warn("Server unreachable", e);
+             this.env.services.notification.add("Offline: Scan Queued", { type: 'warning' });
+         }
+    },
+
+    // -------------------------------------------------------------------------
+    // OLD METHOD (Disabled/Redirected)
+    // -------------------------------------------------------------------------
+    async _onBarcodeScanned(barcode) {
+        // This should not be called for products anymore if scanBarcode is working.
+        // But if super.scanBarcode calls it...
         return super._onBarcodeScanned(barcode);
     },
 
@@ -639,5 +624,50 @@ patch(BarcodePickingModel.prototype, {
     
     willUnmount() {
         if (this._syncInterval) clearInterval(this._syncInterval);
+    }
+});
+
+import { StockBarcodeClientAction } from "@stock_barcode/stock_barcode_client_action";
+
+// -------------------------------------------------------------------------
+// CONTROLLER PATCH (Ultimate Guard)
+// -------------------------------------------------------------------------
+patch(StockBarcodeClientAction.prototype, {
+    async _onBarcodeScanned(barcode) {
+        // Sanitize Input (again, just in case)
+        if (typeof barcode === 'string') {
+            barcode = barcode.replace(/\0/g, '').trim();
+        }
+
+        // STRICT INTERCEPTION: Check if Model has Bayani Snapshot
+        // If so, we let the Model handle it and BLOCK default controller logic if needed.
+        if (this.model && this.model.bayaniSnapshot) {
+             console.log("[Bayani Controller] Intercepting:", barcode);
+             
+             // Delegate to Model's strict scanBarcode logic
+             // If model.scanBarcode handles strictly, it returns/resolves.
+             // BUT standard controller calls this.model.scanBarcode(barcode).
+             // If model returns undefined or false?
+             // Standard controller: `await this.model.scanBarcode(barcode);`
+             // Then it might do other things? No, usually just that.
+             
+             // However, `scanBarcode` in Model (which we patched) calls `super.scanBarcode` at the end
+             // if it didn't block.
+             
+             // If we want to accept "Commands" (like settings), we should let them pass.
+             // Commands usually start with "O-CMD".
+             if (barcode.startsWith("O-CMD")) {
+                 return super._onBarcodeScanned(barcode);
+             }
+             
+             // For strict mode, we call our Model patch.
+             // If model.scanBarcode throws/rejects, we catch it?
+             // Our Model patch returns void if blocked.
+             
+             await this.model.scanBarcode(barcode);
+             return; // STOP CONTROLLER from doing anything else (like default beeps or side effects)
+        }
+        
+        return super._onBarcodeScanned(barcode);
     }
 });
