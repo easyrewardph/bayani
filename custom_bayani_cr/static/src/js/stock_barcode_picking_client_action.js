@@ -10,7 +10,6 @@ import { ConfirmationDialog } from "@web/core/confirmation_dialog/confirmation_d
 patch(BarcodePickingModel.prototype, {
     // setup() removed as BarcodePickingModel is not a Component
 
-
     /**
      * @override
      */
