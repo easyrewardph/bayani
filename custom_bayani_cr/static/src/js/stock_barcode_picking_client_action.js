@@ -345,26 +345,46 @@ patch(BarcodePickingModel.prototype, {
         if (record._name === 'stock.location' || type === 'location') {
             console.log("[Bayani] ===== LOCATION SCAN DETECTED =====");
             
-            // Get all valid source AND destination location IDs from snapshot
+            // Get valid IDs
             const validSourceIds = this.bayaniSnapshot.lines.map(l => l.location_id);
             const validDestIds = this.bayaniSnapshot.lines.map(l => l.location_dest_id);
-            const validLocationIds = [...new Set([...validSourceIds, ...validDestIds])];
             
-            // Validation: Check if the scanned location is in the picking list (either as source or dest)
-            const isValidLocation = validLocationIds.includes(record.id);
+            // Check validation based on operation type
+            // Picking (Delivery/Internal): Logic requires validation against SOURCE (location_id).
+            // Packing/Receipt: Logic might accept DEST (location_dest_id).
             
-            if (!isValidLocation) {
-                console.log("[Bayani] BLOCKING: Scanned location not in picking list.");
-                console.log("[Bayani] Valid IDs:", validLocationIds);
-                console.log("[Bayani] Scanned ID:", record.id);
+            const isPicking = ['outgoing', 'internal'].includes(this.bayaniSnapshot.picking_type_code);
+            const isReceipt = ['incoming'].includes(this.bayaniSnapshot.picking_type_code);
+            
+            let isValid = false;
+            let errorMsg = "";
+            
+            if (isReceipt) {
+                // Receipt: Just check if it's a valid Destination
+                 isValid = validDestIds.includes(record.id) || validSourceIds.includes(record.id);
+                 if (!isValid) {
+                     const validDestNames = [...new Set(this.bayaniSnapshot.lines.map(l => l.location_dest_name))].join(", ");
+                     errorMsg = `The scanned location "${record.display_name}" is not a valid destination for this receipt.\n\nExpected: ${validDestNames}`;
+                 }
+            } else {
+                // Picking / Delivery: STRICT SOURCE CHECK
+                // User Requirement: "Picking accepts wrong source locations... strict location validation against lines[].location_id"
+                isValid = validSourceIds.includes(record.id);
                 
-                // Construct a helpful error message
-                const validSourceNames = [...new Set(this.bayaniSnapshot.lines.map(l => l.location_name))];
-                const validDestNames = [...new Set(this.bayaniSnapshot.lines.map(l => l.location_dest_name))];
-                const allValidNames = [...new Set([...validSourceNames, ...validDestNames])].join(", ");
-                
-                this._bayaniShowError("INVALID LOCATION", 
-                    `The scanned barcode location "${record.display_name}" is not in the picking list.\n\nValid locations are:\n${allValidNames}`);
+                if (!isValid) {
+                     // Check if it was a destination?
+                     if (validDestIds.includes(record.id)) {
+                         errorMsg = `The scanned location "${record.display_name}" is a DESTINATION location. For Picking, please scan the SOURCE location.`;
+                     } else {
+                         const validSourceNames = [...new Set(this.bayaniSnapshot.lines.map(l => l.location_name))].join(", ");
+                         errorMsg = `Scanned location is not part of this picking.\n\nValid Source Locations: ${validSourceNames}`;
+                     }
+                }
+            }
+            
+            if (!isValid) {
+                console.log("[Bayani] BLOCKING: Location Validation Failed.");
+                this._bayaniShowError("INVALID LOCATION", errorMsg);
                 return; // BLOCK
             }
             
