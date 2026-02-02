@@ -560,15 +560,23 @@ patch(BarcodePickingModel.prototype, {
         console.log("[Bayani] _onBarcodeScanned trigger with:", barcode);
 
         // ---------------------------------------------------------
-        // STRICT LOCATION VALIDATION (Scoped to Active Picking Record)
+        // STRICT LOCATION VALIDATION V3 (ResID Strict Scope)
         // ---------------------------------------------------------
-        // Requirement: Validate ONLY against the SELECTED picking's record data.
-        // We use this.currentState.record (the active picking) as the source of truth.
+        // Requirement: Validate ONLY against the SELECTED picking identified by resId.
+        // We do NOT trust currentState.lines unless filtered by picking_id.
+        // We do NOT trust currentState.record move_line_ids blindly if they might differ from lines.
         
-        if (this.currentState && this.currentState.record) {
-             const activePicking = this.currentState.record;
-             const activePickingId = activePicking.id;
-
+        // 1. Identify Active Picking ID
+        let activePickingId = null;
+        if (this.currentState) {
+             if (this.currentState.resId) {
+                 activePickingId = this.currentState.resId;
+             } else if (this.currentState.model && this.currentState.model.root && this.currentState.model.root.resId) {
+                 activePickingId = this.currentState.model.root.resId;
+             }
+        }
+        
+        if (activePickingId) {
              // Resolve barcode to see if it is a location
              const result = await this.cache.getRecordByBarcode(barcode);
              
@@ -576,36 +584,28 @@ patch(BarcodePickingModel.prototype, {
                  const scannedLocId = result.record.id;
                  const scannedLocName = result.record.display_name;
                  
-                 // Determine validation scope (Source vs Dest)
-                 const pickingType = activePicking.picking_type_code || this.record.picking_type_code || 'internal';
+                 // 2. Strict Filtering of Cached Lines
+                 // We use `this.lines` (the full session cache) but apply a STRICT filter.
+                 // Only lines that belong to the activePickingId are considered valid sources of truth.
+                 const activeLines = this.lines.filter(l => l.picking_id && l.picking_id[0] === activePickingId);
+                 
+                 console.log(`[Bayani] Validating Location ${scannedLocName} (${scannedLocId}) against Picking ResID: ${activePickingId}`);
+                 console.log(`[Bayani] Found ${activeLines.length} active lines for this picking.`);
+
+                 // 3. Determine Validation Scope (Source vs Dest)
+                 // We look at the picking type of the active record. 
+                 // If record isn't fully loaded, we assume internal/picking (Source validation) for safety.
+                 const activeRecord = this.currentState.record || (this.currentState.model ? this.currentState.model.root.data : {});
+                 const pickingType = activeRecord.picking_type_code || 'internal';
                  const isPacking = pickingType === 'incoming'; 
                  
-                 console.log(`[Bayani] Validating Location ${scannedLocName} (${scannedLocId}) for Picking ${activePickingId} (${pickingType})`);
-
-                 // Get Valid Lines strictly from the Picking Record
-                 // The user specified: "Use record.move_line_ids"
-                 let relevantLines = activePicking.move_line_ids || [];
-
-                 // If move_line_ids are just IDs (common in Odoo JS models depending on view),
-                 // we must resolve them to objects to check location_id.
-                 // We look them up in `this.lines` which contains the loaded data.
-                 if (relevantLines.length > 0 && typeof relevantLines[0] === 'number') {
-                     // Filter the main lines cache to only those IDs present in this picking's move_line_ids
-                     const validLineIds = new Set(relevantLines);
-                     relevantLines = this.lines.filter(l => validLineIds.has(l.id));
-                 } else if (relevantLines.length > 0 && typeof relevantLines[0] === 'string') {
-                     // Edge case if IDs are strings (rare but possible)
-                     const validLineIds = new Set(relevantLines.map(id => parseInt(id)));
-                     relevantLines = this.lines.filter(l => validLineIds.has(l.id));
-                 }
-                 
-                 // Collect Valid Location IDs
-                 const validLocIds = relevantLines.map(l => 
+                 // 4. Collect Valid Location IDs from STICTLY filtered lines
+                 const validLocIds = activeLines.map(l => 
                      isPacking ? (l.location_dest_id && l.location_dest_id[0]) 
                                : (l.location_id && l.location_id[0])
                  ).filter(id => id); 
                  
-                 // STRICT CHECK
+                 // 5. THE CHECK
                  if (!validLocIds.includes(scannedLocId)) {
                       console.warn(`[Bayani] REJECTED Location ${scannedLocName} (${scannedLocId}) - Not in picking ${activePickingId}`);
                       
@@ -615,12 +615,14 @@ patch(BarcodePickingModel.prototype, {
                           { type: 'danger', title: _t("Invalid Location") }
                       );
                       
-                      // REJECT IMMEDIATELY
+                      // REJECT IMMEDIATELY -> Block everything else
                       return; 
                  }
                  
-                 console.log("[Bayani] Location Validated Successfully.");
+                 console.log("[Bayani] Location Validated Successfully for ResID:", activePickingId);
              }
+        } else {
+             console.warn("[Bayani] Strict Validation Skipped: Could not determine activePickingId from currentState.");
         }
 
         // Force Strict Scan Entry Point
