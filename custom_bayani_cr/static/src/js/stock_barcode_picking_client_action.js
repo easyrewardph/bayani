@@ -694,139 +694,130 @@ patch(BarcodePickingModel.prototype, {
         return null; 
     },
     
-});
-
-// -----------------------------------------------------------------------------
-// STRICT LOCATION GUARD (Client Action Level Interception)
-// -----------------------------------------------------------------------------
-// Requirement: Intercept scans BEFORE they reach the Model/Command execution.
-// We patch the Client Action component itself.
-
-import StockBarcodePickingClientAction from "@stock_barcode/views/stock_barcode_picking_client_action";
-
-patch(StockBarcodePickingClientAction.prototype, {
+    async _onBarcodeScanned(barcode) {
+        console.log("[Bayani] _onBarcodeScanned (Model) trigger with:", barcode);
+        // Force Strict Scan Entry Point
+        if (this.scanBarcode) {
+             await this.scanBarcode(barcode);
+             return; 
+        }
+        return super._onBarcodeScanned(barcode);
+    },
+    
     /**
      * @override
-     * Intercepts valid scans to enforce strict picking-scoped location validation.
+     * GLOBAL INTERCEPTOR (Model Level)
+     * We override scanBarcode to block invalid scans before any processing.
      */
-    async _onBarcodeScanned(barcode) {
-        console.log("[Bayani] ClientAction Intercept:", barcode);
+    async scanBarcode(barcode) {
+        console.log("[Bayani] MODEL GUARD: Scanning:", barcode);
         
-        // 1. Identify Active Picking (ResID)
-        // In the Client Action, the model is available in `this.env.model`
-        const model = this.env.model;
-        if (!model || !model.root || !model.root.resId) {
-            return super._onBarcodeScanned(barcode);
+        // -------------------------------------------------------------
+        // 1. RESOLVE BARCODE
+        // -------------------------------------------------------------
+        let record = null;
+        let type = null;
+        
+        if (this.cache && this.cache.getRecordByBarcode) {
+             const result = await this.cache.getRecordByBarcode(barcode);
+             if (result) {
+                 record = result.record;
+                 type = result.type;
+             }
+        }
+        
+        // -------------------------------------------------------------
+        // 2. IDENTIFY ACTIVE CONTEXT
+        // -------------------------------------------------------------
+        // In Model, `this.record` is the active picking record.
+        const activePickingId = this.record ? this.record.id : null;
+        
+        if (!activePickingId) {
+            console.warn("[Bayani] No active picking in model?");
+            return super.scanBarcode(barcode);
         }
 
-        const activePickingId = model.root.resId;
-        
-        // 2. Resolve Barcode (Is it a location?)
-        // We use the model's cache service
-        const cache = model.cache || (model.env && model.env.services.cache); // Handle varying access based on version
-        let record = null;
-        
-        if (model.cache && model.cache.getRecordByBarcode) {
-            const result = await model.cache.getRecordByBarcode(barcode);
-            if (result && (result.record._name === 'stock.location' || result.type === 'location')) {
-                record = result.record;
-            }
-        }
-        
-        if (record) {
-             console.log(`[Bayani] GUARD: Checking Location ${record.display_name} against Picking ${activePickingId}`);
+        // -------------------------------------------------------------
+        // 3. STRICT LOCATION GUARD
+        // -------------------------------------------------------------
+        if (record && (record._name === 'stock.location' || type === 'location')) {
+             console.log(`[Bayani] GUARD: Validating Location ${record.display_name}`);
              
-             // 3. Strict Filtering
-             // We access the lines from the model (which holds the session state)
-             const allLines = model.lines || []; // or model.currentState.lines? model.lines is standard for BarcodePickingModel
+             // Get Strict Lines
+             const lines = this.lines || [];
+             const activeLines = lines.filter(l => l.picking_id && l.picking_id[0] === activePickingId);
              
-             // Filter strictly by picking_id
-             const activeLines = allLines.filter(l => l.picking_id && l.picking_id[0] === activePickingId);
-             
-             // 4. Validation Scope
-             // Check picking type from root data
-             const rootData = model.root.data || {};
-             const pickingType = rootData.picking_type_code || 'internal';
+             // Validation Scope
+             const pickingType = (this.record.picking_type_code) || 'internal';
              const isPacking = pickingType === 'incoming';
              
              const validLocIds = activeLines.map(l => 
-                 isPacking ? (l.location_dest_id && l.location_dest_id[0]) 
-                           : (l.location_id && l.location_id[0])
+                 isPacking ? (l.location_dest_id ? l.location_dest_id[0] : null) 
+                           : (l.location_id ? l.location_id[0] : null)
              ).filter(id => id);
              
-             // 5. Block if Invalid
              if (!validLocIds.includes(record.id)) {
-                 console.warn(`[Bayani] GUARD: BLOCKED Location ${record.display_name} - Not in Picking ${activePickingId}`);
-                 // ... notification ...
-                 this.env.services.notification.add(
+                  console.warn(`[Bayani] BLOCKED Location ${record.display_name} - Not in Picking ${activePickingId}`);
+                  this.env.services.notification.add(
                       _t("Scanned location is not part of the selected picking"), 
                       { type: 'danger', title: _t("Strict Validation Guard") }
-                 );
-                 return;
+                  );
+                  return; // BLOCK
              }
              
-             console.log("[Bayani] GUARD: Location Allowed.");
+             console.log("[Bayani] Location Allowed.");
         }
-        else if (record && (record._name === 'stock.lot' || record.type === 'lot')) {
-             console.log(`[Bayani] GUARD: Checking Lot ${record.name} against Picking ${activePickingId}`);
+
+        // -------------------------------------------------------------
+        // 4. STRICT LOT/SERIAL GUARD
+        // -------------------------------------------------------------
+        if (record && (record._name === 'stock.lot' || type === 'lot')) {
+             console.log(`[Bayani] GUARD: Validating Lot ${record.name}`);
              
-             // STRICT LOT VALIDATION
-             // Requirement: Must exist in Active Picking + Active Location + Have Qty
-             
-             const currentLocationId = model.currentLocationId; 
-             // Note: currentLocationId is set by our previous Location guard/logic in the model.
+             const currentLocationId = this.currentLocationId; // Model keeps track of this?
+             // If this.currentLocationId is not reliable in Model, we might need another way.
+             // But usually BarcodePickingModel maintains strict state if designed well.
              
              if (!currentLocationId) {
-                 console.warn("[Bayani] GUARD: BLOCKED Lot - No Location Selected");
                  this.env.services.notification.add(
                       _t("Please scan a Source Location first."), 
                       { type: 'danger', title: _t("Action Required") }
                  );
-                 return;
+                 return; // BLOCK
              }
              
-             const allLines = model.lines || [];
-             
-             // Filter: Picking + Location + Lot
-             const validLines = allLines.filter(l => 
+             const lines = this.lines || [];
+             const validLines = lines.filter(l => 
                  l.picking_id && l.picking_id[0] === activePickingId && 
                  l.location_id && l.location_id[0] === currentLocationId &&
                  l.lot_id && l.lot_id[0] === record.id
              );
              
              if (validLines.length === 0) {
-                 // Determine specific error for feedback
-                 const existsInPicking = allLines.some(l => l.picking_id[0] === activePickingId && l.lot_id && l.lot_id[0] === record.id);
+                 const existsInPicking = lines.some(l => l.picking_id[0] === activePickingId && l.lot_id && l.lot_id[0] === record.id);
+                 let msg = "This lot does not belong to the selected location or picking.";
+                 if (existsInPicking) msg = "This lot exists in the picking but NOT in the selected location.";
                  
-                 let errorMsg = "This lot does not belong to the selected location or picking.";
-                 if (existsInPicking) {
-                      errorMsg = "This lot exists in the picking but NOT in the selected location.";
-                 }
-                 
-                 console.warn(`[Bayani] GUARD: BLOCKED Lot ${record.name} - No match in P:${activePickingId} L:${currentLocationId}`);
                  this.env.services.notification.add(
-                      _t(errorMsg), 
+                      _t(msg), 
                       { type: 'danger', title: _t("Strict Lot Validation") }
                  );
-                 return;
+                 return; // BLOCK
              }
              
-             // Check Quantity Availability (optional but requested "Available quantity > 0")
-             // We check if ANY line has remaining qty
+             // Quantity Check
              const hasSpace = validLines.some(l => (l.qty_reserved || 0) > (l.qty_done || 0));
-             
              if (!hasSpace) {
-                  console.warn(`[Bayani] GUARD: BLOCKED Lot ${record.name} - Already fully scanned`);
                   this.env.services.notification.add(
                       _t("All items for this lot at this location have already been scanned."), 
                       { type: 'warning', title: _t("Quantity Exceeded") }
-                 );
-                 return;
+                  );
+                  return; // BLOCK
              }
              
-             console.log("[Bayani] GUARD: Lot Allowed.");
+             console.log("[Bayani] Lot Allowed.");
         }
 
-        return super._onBarcodeScanned(barcode);
-    }
+        return super.scanBarcode(barcode);
+    },
 });
