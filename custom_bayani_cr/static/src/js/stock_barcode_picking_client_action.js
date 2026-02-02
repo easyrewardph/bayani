@@ -712,6 +712,13 @@ patch(BarcodePickingModel.prototype, {
     async scanBarcode(barcode) {
         console.log("[Bayani] MODEL GUARD: Scanning:", barcode);
         
+        // Helper to safely get ID from Many2one (Array or ID)
+        const getId = (field) => {
+            if (!field) return null;
+            if (Array.isArray(field)) return field[0];
+            return field;
+        };
+
         // -------------------------------------------------------------
         // 1. RESOLVE BARCODE
         // -------------------------------------------------------------
@@ -729,7 +736,6 @@ patch(BarcodePickingModel.prototype, {
         // -------------------------------------------------------------
         // 2. IDENTIFY ACTIVE CONTEXT
         // -------------------------------------------------------------
-        // In Model, `this.record` is the active picking record.
         const activePickingId = this.record ? this.record.id : null;
         
         if (!activePickingId) {
@@ -743,17 +749,15 @@ patch(BarcodePickingModel.prototype, {
         if (record && (record._name === 'stock.location' || type === 'location')) {
              console.log(`[Bayani] GUARD: Validating Location ${record.display_name}`);
              
-             // Get Strict Lines
              const lines = this.lines || [];
-             const activeLines = lines.filter(l => l.picking_id && l.picking_id[0] === activePickingId);
+             const activeLines = lines.filter(l => getId(l.picking_id) === activePickingId);
              
-             // Validation Scope
              const pickingType = (this.record.picking_type_code) || 'internal';
              const isPacking = pickingType === 'incoming';
              
              const validLocIds = activeLines.map(l => 
-                 isPacking ? (l.location_dest_id ? l.location_dest_id[0] : null) 
-                           : (l.location_id ? l.location_id[0] : null)
+                 isPacking ? getId(l.location_dest_id) 
+                           : getId(l.location_id)
              ).filter(id => id);
              
              if (!validLocIds.includes(record.id)) {
@@ -774,9 +778,9 @@ patch(BarcodePickingModel.prototype, {
         if (record && (record._name === 'stock.lot' || type === 'lot')) {
              console.log(`[Bayani] GUARD: Validating Lot ${record.name}`);
              
-             const currentLocationId = this.currentLocationId; // Model keeps track of this?
-             // If this.currentLocationId is not reliable in Model, we might need another way.
-             // But usually BarcodePickingModel maintains strict state if designed well.
+             // Ensure we check picking FIRST before blocking on location?
+             // Use this.locationId which is often the source of truth for "scanned/locked" location
+             const currentLocationId = this.locationId || this.currentLocationId; 
              
              if (!currentLocationId) {
                  this.env.services.notification.add(
@@ -788,13 +792,13 @@ patch(BarcodePickingModel.prototype, {
              
              const lines = this.lines || [];
              const validLines = lines.filter(l => 
-                 l.picking_id && l.picking_id[0] === activePickingId && 
-                 l.location_id && l.location_id[0] === currentLocationId &&
-                 l.lot_id && l.lot_id[0] === record.id
+                 getId(l.picking_id) === activePickingId && 
+                 getId(l.location_id) === currentLocationId &&
+                 getId(l.lot_id) === record.id
              );
              
              if (validLines.length === 0) {
-                 const existsInPicking = lines.some(l => l.picking_id[0] === activePickingId && l.lot_id && l.lot_id[0] === record.id);
+                 const existsInPicking = lines.some(l => getId(l.picking_id) === activePickingId && getId(l.lot_id) === record.id);
                  let msg = "This lot does not belong to the selected location or picking.";
                  if (existsInPicking) msg = "This lot exists in the picking but NOT in the selected location.";
                  
@@ -805,7 +809,6 @@ patch(BarcodePickingModel.prototype, {
                  return; // BLOCK
              }
              
-             // Quantity Check
              const hasSpace = validLines.some(l => (l.qty_reserved || 0) > (l.qty_done || 0));
              if (!hasSpace) {
                   this.env.services.notification.add(
