@@ -558,6 +558,53 @@ patch(BarcodePickingModel.prototype, {
     // -------------------------------------------------------------------------
     async _onBarcodeScanned(barcode) {
         console.log("[Bayani] _onBarcodeScanned trigger with:", barcode);
+
+        // ---------------------------------------------------------
+        // STRICT LOCATION VALIDATION (Scoped to Active Picking)
+        // ---------------------------------------------------------
+        // Requirement: Location validation must be done ONLY against the ACTIVE / SELECTED picking
+        if (this.currentState && this.currentState.picking_id) {
+             const activePickingId = this.currentState.picking_id[0];
+             
+             // Resolve barcode to see if it is a location
+             // We use cache.getRecordByBarcode to identify the type without side effects
+             const result = await this.cache.getRecordByBarcode(barcode);
+             
+             if (result && (result.record._name === 'stock.location' || result.type === 'location')) {
+                 const scannedLocId = result.record.id;
+                 const scannedLocName = result.record.display_name;
+                 
+                 // Filter lines belonging solely to the active picking
+                 // We rely on this.lines which contains the model data
+                 const activeLines = this.lines.filter(l => l.picking_id && l.picking_id[0] === activePickingId);
+                 
+                 // Determine validation scope (Source vs Dest)
+                 // Picking (Delivery/Internal) -> Source (location_id)
+                 // Packing (Receipt) -> Destination (location_dest_id)
+                 const pickingType = this.record.picking_type_code || 'internal';
+                 const isPacking = pickingType === 'incoming'; 
+                 
+                 // Collect Valid Location IDs from the ACTIVE picking lines only
+                 const validLocIds = activeLines.map(l => 
+                     isPacking ? (l.location_dest_id && l.location_dest_id[0]) 
+                               : (l.location_id && l.location_id[0])
+                 ).filter(id => id); 
+                 
+                 if (!validLocIds.includes(scannedLocId)) {
+                      console.warn(`[Bayani] REJECTED Location ${scannedLocName} (${scannedLocId}) - Not in picking ${activePickingId}`);
+                      
+                      // Show Error Message
+                      this.env.services.notification.add(
+                          _t("Scanned location is not part of the selected picking"), 
+                          { type: 'danger', title: _t("Invalid Location") }
+                      );
+                      
+                      // REJECT IMMEDIATELY - Do not proceed to scanBarcode or super
+                      return; 
+                 }
+             }
+        }
+
         // Force Strict Scan Entry Point
         if (this.scanBarcode) {
              await this.scanBarcode(barcode);
