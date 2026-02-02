@@ -757,20 +757,74 @@ patch(StockBarcodePickingClientAction.prototype, {
              // 5. Block if Invalid
              if (!validLocIds.includes(record.id)) {
                  console.warn(`[Bayani] GUARD: BLOCKED Location ${record.display_name} - Not in Picking ${activePickingId}`);
-                 
+                 // ... notification ...
                  this.env.services.notification.add(
                       _t("Scanned location is not part of the selected picking"), 
                       { type: 'danger', title: _t("Strict Validation Guard") }
                  );
-                 
-                 // STOP EXECUTION: Do not call super, do not execute commands.
-                 // We return true (or promise) to indicate handled/stopped? 
-                 // Actually _onBarcodeScanned usually returns accepted status or void. 
-                 // By not calling super, we prevent the model action.
                  return;
              }
              
              console.log("[Bayani] GUARD: Location Allowed.");
+        }
+        else if (record && (record._name === 'stock.lot' || record.type === 'lot')) {
+             console.log(`[Bayani] GUARD: Checking Lot ${record.name} against Picking ${activePickingId}`);
+             
+             // STRICT LOT VALIDATION
+             // Requirement: Must exist in Active Picking + Active Location + Have Qty
+             
+             const currentLocationId = model.currentLocationId; 
+             // Note: currentLocationId is set by our previous Location guard/logic in the model.
+             
+             if (!currentLocationId) {
+                 console.warn("[Bayani] GUARD: BLOCKED Lot - No Location Selected");
+                 this.env.services.notification.add(
+                      _t("Please scan a Source Location first."), 
+                      { type: 'danger', title: _t("Action Required") }
+                 );
+                 return;
+             }
+             
+             const allLines = model.lines || [];
+             
+             // Filter: Picking + Location + Lot
+             const validLines = allLines.filter(l => 
+                 l.picking_id && l.picking_id[0] === activePickingId && 
+                 l.location_id && l.location_id[0] === currentLocationId &&
+                 l.lot_id && l.lot_id[0] === record.id
+             );
+             
+             if (validLines.length === 0) {
+                 // Determine specific error for feedback
+                 const existsInPicking = allLines.some(l => l.picking_id[0] === activePickingId && l.lot_id && l.lot_id[0] === record.id);
+                 
+                 let errorMsg = "This lot does not belong to the selected location or picking.";
+                 if (existsInPicking) {
+                      errorMsg = "This lot exists in the picking but NOT in the selected location.";
+                 }
+                 
+                 console.warn(`[Bayani] GUARD: BLOCKED Lot ${record.name} - No match in P:${activePickingId} L:${currentLocationId}`);
+                 this.env.services.notification.add(
+                      _t(errorMsg), 
+                      { type: 'danger', title: _t("Strict Lot Validation") }
+                 );
+                 return;
+             }
+             
+             // Check Quantity Availability (optional but requested "Available quantity > 0")
+             // We check if ANY line has remaining qty
+             const hasSpace = validLines.some(l => (l.qty_reserved || 0) > (l.qty_done || 0));
+             
+             if (!hasSpace) {
+                  console.warn(`[Bayani] GUARD: BLOCKED Lot ${record.name} - Already fully scanned`);
+                  this.env.services.notification.add(
+                      _t("All items for this lot at this location have already been scanned."), 
+                      { type: 'warning', title: _t("Quantity Exceeded") }
+                 );
+                 return;
+             }
+             
+             console.log("[Bayani] GUARD: Lot Allowed.");
         }
 
         return super._onBarcodeScanned(barcode);
