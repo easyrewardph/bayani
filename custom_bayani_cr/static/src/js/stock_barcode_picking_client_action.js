@@ -557,74 +557,7 @@ patch(BarcodePickingModel.prototype, {
     // OLD METHOD (Disabled/Redirected)
     // -------------------------------------------------------------------------
     async _onBarcodeScanned(barcode) {
-        console.log("[Bayani] _onBarcodeScanned trigger with:", barcode);
-
-        // ---------------------------------------------------------
-        // STRICT LOCATION VALIDATION V3 (ResID Strict Scope)
-        // ---------------------------------------------------------
-        // Requirement: Validate ONLY against the SELECTED picking identified by resId.
-        // We do NOT trust currentState.lines unless filtered by picking_id.
-        // We do NOT trust currentState.record move_line_ids blindly if they might differ from lines.
-        
-        // 1. Identify Active Picking ID
-        let activePickingId = null;
-        if (this.currentState) {
-             if (this.currentState.resId) {
-                 activePickingId = this.currentState.resId;
-             } else if (this.currentState.model && this.currentState.model.root && this.currentState.model.root.resId) {
-                 activePickingId = this.currentState.model.root.resId;
-             }
-        }
-        
-        if (activePickingId) {
-             // Resolve barcode to see if it is a location
-             const result = await this.cache.getRecordByBarcode(barcode);
-             
-             if (result && (result.record._name === 'stock.location' || result.type === 'location')) {
-                 const scannedLocId = result.record.id;
-                 const scannedLocName = result.record.display_name;
-                 
-                 // 2. Strict Filtering of Cached Lines
-                 // We use `this.lines` (the full session cache) but apply a STRICT filter.
-                 // Only lines that belong to the activePickingId are considered valid sources of truth.
-                 const activeLines = this.lines.filter(l => l.picking_id && l.picking_id[0] === activePickingId);
-                 
-                 console.log(`[Bayani] Validating Location ${scannedLocName} (${scannedLocId}) against Picking ResID: ${activePickingId}`);
-                 console.log(`[Bayani] Found ${activeLines.length} active lines for this picking.`);
-
-                 // 3. Determine Validation Scope (Source vs Dest)
-                 // We look at the picking type of the active record. 
-                 // If record isn't fully loaded, we assume internal/picking (Source validation) for safety.
-                 const activeRecord = this.currentState.record || (this.currentState.model ? this.currentState.model.root.data : {});
-                 const pickingType = activeRecord.picking_type_code || 'internal';
-                 const isPacking = pickingType === 'incoming'; 
-                 
-                 // 4. Collect Valid Location IDs from STICTLY filtered lines
-                 const validLocIds = activeLines.map(l => 
-                     isPacking ? (l.location_dest_id && l.location_dest_id[0]) 
-                               : (l.location_id && l.location_id[0])
-                 ).filter(id => id); 
-                 
-                 // 5. THE CHECK
-                 if (!validLocIds.includes(scannedLocId)) {
-                      console.warn(`[Bayani] REJECTED Location ${scannedLocName} (${scannedLocId}) - Not in picking ${activePickingId}`);
-                      
-                      // Show Error Message
-                      this.env.services.notification.add(
-                          _t("Scanned location is not part of the selected picking"), 
-                          { type: 'danger', title: _t("Invalid Location") }
-                      );
-                      
-                      // REJECT IMMEDIATELY -> Block everything else
-                      return; 
-                 }
-                 
-                 console.log("[Bayani] Location Validated Successfully for ResID:", activePickingId);
-             }
-        } else {
-             console.warn("[Bayani] Strict Validation Skipped: Could not determine activePickingId from currentState.");
-        }
-
+        console.log("[Bayani] _onBarcodeScanned (Model) trigger with:", barcode);
         // Force Strict Scan Entry Point
         if (this.scanBarcode) {
              await this.scanBarcode(barcode);
@@ -761,7 +694,85 @@ patch(BarcodePickingModel.prototype, {
         return null; 
     },
     
-    willUnmount() {
-        if (this._syncInterval) clearInterval(this._syncInterval);
+});
+
+// -----------------------------------------------------------------------------
+// STRICT LOCATION GUARD (Client Action Level Interception)
+// -----------------------------------------------------------------------------
+// Requirement: Intercept scans BEFORE they reach the Model/Command execution.
+// We patch the Client Action component itself.
+
+import StockBarcodePickingClientAction from "@stock_barcode/views/stock_barcode_picking_client_action";
+
+patch(StockBarcodePickingClientAction.prototype, {
+    /**
+     * @override
+     * Intercepts valid scans to enforce strict picking-scoped location validation.
+     */
+    async _onBarcodeScanned(barcode) {
+        console.log("[Bayani] ClientAction Intercept:", barcode);
+        
+        // 1. Identify Active Picking (ResID)
+        // In the Client Action, the model is available in `this.env.model`
+        const model = this.env.model;
+        if (!model || !model.root || !model.root.resId) {
+            return super._onBarcodeScanned(barcode);
+        }
+
+        const activePickingId = model.root.resId;
+        
+        // 2. Resolve Barcode (Is it a location?)
+        // We use the model's cache service
+        const cache = model.cache || (model.env && model.env.services.cache); // Handle varying access based on version
+        let record = null;
+        
+        if (model.cache && model.cache.getRecordByBarcode) {
+            const result = await model.cache.getRecordByBarcode(barcode);
+            if (result && (result.record._name === 'stock.location' || result.type === 'location')) {
+                record = result.record;
+            }
+        }
+        
+        if (record) {
+             console.log(`[Bayani] GUARD: Checking Location ${record.display_name} against Picking ${activePickingId}`);
+             
+             // 3. Strict Filtering
+             // We access the lines from the model (which holds the session state)
+             const allLines = model.lines || []; // or model.currentState.lines? model.lines is standard for BarcodePickingModel
+             
+             // Filter strictly by picking_id
+             const activeLines = allLines.filter(l => l.picking_id && l.picking_id[0] === activePickingId);
+             
+             // 4. Validation Scope
+             // Check picking type from root data
+             const rootData = model.root.data || {};
+             const pickingType = rootData.picking_type_code || 'internal';
+             const isPacking = pickingType === 'incoming';
+             
+             const validLocIds = activeLines.map(l => 
+                 isPacking ? (l.location_dest_id && l.location_dest_id[0]) 
+                           : (l.location_id && l.location_id[0])
+             ).filter(id => id);
+             
+             // 5. Block if Invalid
+             if (!validLocIds.includes(record.id)) {
+                 console.warn(`[Bayani] GUARD: BLOCKED Location ${record.display_name} - Not in Picking ${activePickingId}`);
+                 
+                 this.env.services.notification.add(
+                      _t("Scanned location is not part of the selected picking"), 
+                      { type: 'danger', title: _t("Strict Validation Guard") }
+                 );
+                 
+                 // STOP EXECUTION: Do not call super, do not execute commands.
+                 // We return true (or promise) to indicate handled/stopped? 
+                 // Actually _onBarcodeScanned usually returns accepted status or void. 
+                 // By not calling super, we prevent the model action.
+                 return;
+             }
+             
+             console.log("[Bayani] GUARD: Location Allowed.");
+        }
+
+        return super._onBarcodeScanned(barcode);
     }
 });
