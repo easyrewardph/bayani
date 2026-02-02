@@ -653,8 +653,6 @@ patch(BarcodePickingModel.prototype, {
     }
 });
 
-import { registry } from "@web/core/registry";
-
 // -------------------------------------------------------------------------
 // CONTROLLER PATCH V8 (Registry Based)
 // -------------------------------------------------------------------------
