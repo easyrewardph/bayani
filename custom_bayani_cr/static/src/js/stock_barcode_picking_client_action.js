@@ -344,31 +344,19 @@ patch(BarcodePickingModel.prototype, {
         // 5. LOCATION VALIDATION - Check snapshot FIRST
         if (record._name === 'stock.location' || type === 'location') {
             console.log("[Bayani] ===== LOCATION SCAN DETECTED =====");
-            console.log("[Bayani] Location name:", record.display_name);
-            console.log("[Bayani] Location ID:", record.id);
-            console.log("[Bayani] Location barcode:", record.barcode);
             
             // Get all valid source location IDs from snapshot
+            // We check 'location_id' (Source) because we are picking FROM these locations.
             const validLocationIds = [...new Set(this.bayaniSnapshot.lines.map(l => l.location_id))];
-            const validLocationNames = [...new Set(this.bayaniSnapshot.lines.map(l => l.location_name))];
             
-            console.log("[Bayani] Valid source location IDs in picking:", validLocationIds);
-            console.log("[Bayani] Valid source location NAMES in picking:", validLocationNames);
-            console.log("[Bayani] Scanned location ID:", record.id);
-            console.log("[Bayani] Checking if", record.id, "is in", validLocationIds);
-            
-            // CHECK 1: Is this location in the picking at all?
+            // Validation: Check if the scanned location is in the picking list
             const isValidLocation = validLocationIds.includes(record.id);
-            console.log("[Bayani] Is location valid?", isValidLocation);
             
             if (!isValidLocation) {
-                console.log("[Bayani] ===== BLOCKING: INVALID LOCATION =====");
-                console.log("[Bayani] Scanned:", record.display_name, "(ID:", record.id, ")");
-                console.log("[Bayani] Expected one of:", validLocationNames.join(", "));
-                
-                this._bayaniShowError("WRONG LOCATION", 
-                    `Location "${record.display_name}" is not part of this picking.\n\nValid source locations:\n${this._getValidLocationNames()}`);
-                return; // BLOCK - DO NOT PROCEED
+                console.log("[Bayani] BLOCKING: Scanned location not in picking list.");
+                this._bayaniShowError("INVALID LOCATION", 
+                    "The scanned barcode location is not in the picking list.");
+                return; // BLOCK
             }
             
             // CHECK 2: Does this location have pending work?
@@ -376,20 +364,16 @@ patch(BarcodePickingModel.prototype, {
                 .filter(l => l.qty_done < l.qty_reserved)
                 .map(l => l.location_id);
             
-            console.log("[Bayani] Locations with pending work:", pendingLocationIds);
             const hasPendingWork = pendingLocationIds.includes(record.id);
-            console.log("[Bayani] Does location have pending work?", hasPendingWork);
             
             if (!hasPendingWork) {
-                console.log("[Bayani] ===== BLOCKING: NO PENDING WORK =====");
                 this._bayaniShowError("LOCATION COMPLETE", 
                     `All items from "${record.display_name}" have already been picked.`);
                 return; // BLOCK
             }
 
             // SUCCESS: Lock to this location
-            console.log("[Bayani] ===== SUCCESS: LOCKING TO LOCATION =====");
-            console.log("[Bayani] Locked to:", record.display_name, "(ID:", record.id, ")");
+            console.log("[Bayani] Locked to:", record.display_name);
             this.currentLocationId = record.id;
             this.env.services.notification.add(_t(`Locked to ${record.display_name}`), { type: 'success' });
             return; // Handled
