@@ -2,6 +2,7 @@
 console.log("[Bayani] JS Module Loaded! If you see this, the file is being read.");
 
 import { patch } from "@web/core/utils/patch";
+import { registry } from "@web/core/registry";
 import BarcodePickingModel from "@stock_barcode/models/barcode_picking_model";
 import { _t } from "@web/core/l10n/translation";
 import { ConfirmationDialog } from "@web/core/confirmation_dialog/confirmation_dialog";
@@ -107,7 +108,7 @@ patch(BarcodePickingModel.prototype, {
             if (result.status === 'success') {
                 this.bayaniSnapshot = result.data;
                 console.log("[Bayani] Snapshot Loaded:", this.bayaniSnapshot);
-                this.env.services.notification.add(_t("Bayani V7 Strict Active"), { type: 'success' });
+                this.env.services.notification.add(_t("Bayani V8 Registry Active"), { type: 'success' });
                 
                 // 2. Pre-Pick Validation (Blocking)
                 const blockage = this._bayaniCheckStockAvailability();
@@ -329,14 +330,29 @@ patch(BarcodePickingModel.prototype, {
 
              // A. Location Scan -> Lock (Allowed)
              if (record._name === 'stock.location' || type === 'location') {
-                 // Check if valid source
-                 const validLocs = [...new Set(this.bayaniSnapshot.lines.map(l => l.location_id))];
-                 if (!validLocs.includes(record.id)) {
+                 // Check if valid source (Any line matches)
+                 const scannedId = record.id;
+                 const allLocs = this.bayaniSnapshot.lines.map(l => l.location_id);
+                 
+                 if (!allLocs.includes(scannedId)) {
                       this._bayaniShowError("WRONG LOCATION", 
-                        `Expected: ${this.bayaniSnapshot.location_name}\nScanned: ${record.display_name}\n\nSTRICT RULE: You must scan the correct source location.`);
+                        "Item cannot be added: this product does not belong to this location.");
                       return; // BLOCK
                  }
-                 this.currentLocationId = record.id;
+                 
+                 // Check if location has PENDING work
+                 // We filter lines that are NOT fully picked
+                 const pendingLocs = this.bayaniSnapshot.lines
+                    .filter(l => l.qty_done < l.qty_reserved)
+                    .map(l => l.location_id);
+                 
+                 if (!pendingLocs.includes(scannedId)) {
+                      this._bayaniShowError("LOCATION DONE", 
+                        "All items for this location have already been scanned/picked.");
+                      return; // BLOCK
+                 }
+
+                 this.currentLocationId = scannedId;
                  this.env.services.notification.add(_t(`Locked to ${record.display_name}`), { type: 'success' });
                  return; // Handled
              }
@@ -366,7 +382,7 @@ patch(BarcodePickingModel.prototype, {
                          // Check if it's a valid lot but WRONG location
                          const otherLocLine = this.bayaniSnapshot.lines.find(l => l.lot_id === record.id);
                          if (otherLocLine) {
-                             this._bayaniShowError("WRONG LOCATION", `This item is in ${otherLocLine.location_name}, NOT here.`);
+                             this._bayaniShowError("WRONG LOCATION", "Item cannot be added: this product does not belong to this location.");
                          } else {
                              this._bayaniShowError("LOT MISMATCH", `Scanned Lot "${record.name}" is not in the pick list for this location.`);
                          }
@@ -383,7 +399,7 @@ patch(BarcodePickingModel.prototype, {
                           // Check if valid product but WRONG location
                           const otherLocLine = this.bayaniSnapshot.lines.find(l => (l.product_id === record.id || l.product_barcode === barcode));
                           if (otherLocLine) {
-                              this._bayaniShowError("WRONG LOCATION", `This product is in ${otherLocLine.location_name}, NOT here.`);
+                              this._bayaniShowError("WRONG LOCATION", "Item cannot be added: this product does not belong to this location.");
                           } else {
                               this._bayaniShowError("UNAUTHORIZED PRODUCT", "Product not found in this picking.");
                           }
@@ -636,4 +652,53 @@ patch(BarcodePickingModel.prototype, {
         if (this._syncInterval) clearInterval(this._syncInterval);
     }
 });
+
+import { registry } from "@web/core/registry";
+
+// -------------------------------------------------------------------------
+// CONTROLLER PATCH V8 (Registry Based)
+// -------------------------------------------------------------------------
+const barcodeClientAction = registry.category("actions").get("stock.barcode_client_action");
+if (barcodeClientAction) {
+    console.log("[Bayani] Patching Controller via Registry");
+    patch(barcodeClientAction.prototype, {
+        async _onBarcodeScanned(barcode) {
+            // Sanitize
+            if (typeof barcode === 'string') {
+                barcode = barcode.replace(/\0/g, '').trim();
+            }
+
+            console.log("[Bayani Controller] Scan:", barcode);
+
+            // Access Model
+            // In ClientAction, this.model refers to the BarcodePickingModel instance
+            if (this.model && this.model.bayaniSnapshot) {
+                 // Check logic
+                 // 1. Exception for Commands
+                 if (barcode.startsWith("O-CMD") || barcode.startsWith("O-BTN")) {
+                     return super._onBarcodeScanned(barcode);
+                 }
+
+                 // 2. Strict Check via Model Helper (we call our patched scanBarcode)
+                 // NOTE: Since we patched Model.scanBarcode to be strict, calling it is safe.
+                 // BUT we must prevent `super._onBarcodeScanned` from running if Model blocks.
+                 
+                 // However, we need to know if Model blocked it or not?
+                 // Our Model.scanBarcode returns void (undefined) if blocked or processed.
+                 // It only throws if error? 
+                 // Actually, our Model.scanBarcode calls `super.scanBarcode` if it falls through.
+                 // So if we call `this.model.scanBarcode(barcode)`, it runs the whole chain.
+                 // This effectively BYPASSES the rest of the logic in ClientAction._onBarcodeScanned
+                 // which is exactly what we want.
+                 
+                 await this.model.scanBarcode(barcode);
+                 return; // STOP. ClientAction work is done.
+            }
+            
+            return super._onBarcodeScanned(barcode);
+        }
+    });
+} else {
+    console.error("[Bayani] Failed to find stock.barcode_client_action in registry");
+}
 
