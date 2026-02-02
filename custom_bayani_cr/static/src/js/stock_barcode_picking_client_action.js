@@ -345,11 +345,12 @@ patch(BarcodePickingModel.prototype, {
         if (record._name === 'stock.location' || type === 'location') {
             console.log("[Bayani] ===== LOCATION SCAN DETECTED =====");
             
-            // Get all valid source location IDs from snapshot
-            // We check 'location_id' (Source) because we are picking FROM these locations.
-            const validLocationIds = [...new Set(this.bayaniSnapshot.lines.map(l => l.location_id))];
+            // Get all valid source AND destination location IDs from snapshot
+            const validSourceIds = this.bayaniSnapshot.lines.map(l => l.location_id);
+            const validDestIds = this.bayaniSnapshot.lines.map(l => l.location_dest_id);
+            const validLocationIds = [...new Set([...validSourceIds, ...validDestIds])];
             
-            // Validation: Check if the scanned location is in the picking list
+            // Validation: Check if the scanned location is in the picking list (either as source or dest)
             const isValidLocation = validLocationIds.includes(record.id);
             
             if (!isValidLocation) {
@@ -358,10 +359,12 @@ patch(BarcodePickingModel.prototype, {
                 console.log("[Bayani] Scanned ID:", record.id);
                 
                 // Construct a helpful error message
-                const validNames = [...new Set(this.bayaniSnapshot.lines.map(l => l.location_name))].join(", ");
+                const validSourceNames = [...new Set(this.bayaniSnapshot.lines.map(l => l.location_name))];
+                const validDestNames = [...new Set(this.bayaniSnapshot.lines.map(l => l.location_dest_name))];
+                const allValidNames = [...new Set([...validSourceNames, ...validDestNames])].join(", ");
                 
                 this._bayaniShowError("INVALID LOCATION", 
-                    `The scanned barcode location "${record.display_name}" is not in the picking list.\n\nValid locations are: ${validNames}`);
+                    `The scanned barcode location "${record.display_name}" is not in the picking list.\n\nValid locations are:\n${allValidNames}`);
                 return; // BLOCK
             }
             

@@ -311,6 +311,8 @@ class StockPicking(models.Model):
                 'qty_done': line.qty_done,
                 'location_id': line.location_id.id, # Expected Source
                 'location_name': line.location_id.display_name,
+                'location_dest_id': line.location_dest_id.id, # Expected Destination
+                'location_dest_name': line.location_dest_id.display_name,
                 'available_qty_at_source': available_qty,
                 'state': line.state,
             }
