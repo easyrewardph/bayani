@@ -321,134 +321,163 @@ patch(BarcodePickingModel.prototype, {
              return; 
         }
 
-        // 2. Resolve Barcode Locally
+        // 2. EXCEPTION: Allow Odoo Commands (e.g. O-CMD.VALIDATE)
+        if (barcode && (barcode.startsWith("O-CMD") || barcode.startsWith("O-BTN"))) {
+            console.log("[Bayani] Allowing command:", barcode);
+            return super.scanBarcode(barcode);
+        }
+
+        // 3. Resolve Barcode Locally
         const result = await this.cache.getRecordByBarcode(barcode);
+        console.log("[Bayani] Cache lookup result:", result);
         
-        // 3. Strict Validation Logic
-        if (result && result.record) {
-             const { record, type } = result;
-
-             // A. Location Scan -> Lock (Allowed)
-             if (record._name === 'stock.location' || type === 'location') {
-                 // Check if valid source (Any line matches)
-                 const scannedId = record.id;
-                 const allLocs = this.bayaniSnapshot.lines.map(l => l.location_id);
-                 
-                 if (!allLocs.includes(scannedId)) {
-                      this._bayaniShowError("WRONG LOCATION", 
-                        "Item cannot be added: this product does not belong to this location.");
-                      return; // BLOCK
-                 }
-                 
-                 // Check if location has PENDING work
-                 // We filter lines that are NOT fully picked
-                 const pendingLocs = this.bayaniSnapshot.lines
-                    .filter(l => l.qty_done < l.qty_reserved)
-                    .map(l => l.location_id);
-                 
-                 if (!pendingLocs.includes(scannedId)) {
-                      this._bayaniShowError("LOCATION DONE", 
-                        "All items for this location have already been scanned/picked.");
-                      return; // BLOCK
-                 }
-
-                 this.currentLocationId = scannedId;
-                 this.env.services.notification.add(_t(`Locked to ${record.display_name}`), { type: 'success' });
-                 return; // Handled
-             }
-             
-             // B. Product/Lot Scan
-             const isProductOrLot = record._name === 'stock.lot' || type === 'lot' || record._name === 'product.product' || type === 'product';
-             if (isProductOrLot) {
-                 if (!this.currentLocationId) {
-                      this._bayaniShowError("ACTION REQUIRED", "Please scan a destination location first.");
-                      return; // BLOCK
-                 }
-
-                 // STRICT FILTERING
-                 // We must find a valid line in our snapshot that matches:
-                 // 1. The scanned product/lot
-                 // 2. The CURRENT locked location
-                 
-                 let validLine = null;
-                 
-                 if (record._name === 'stock.lot' || type === 'lot') {
-                     validLine = this.bayaniSnapshot.lines.find(l => 
-                         l.lot_id === record.id && 
-                         l.location_id === this.currentLocationId
-                     );
-                     
-                     if (!validLine) {
-                         // Check if it's a valid lot but WRONG location
-                         const otherLocLine = this.bayaniSnapshot.lines.find(l => l.lot_id === record.id);
-                         if (otherLocLine) {
-                             this._bayaniShowError("WRONG LOCATION", "Item cannot be added: this product does not belong to this location.");
-                         } else {
-                             this._bayaniShowError("LOT MISMATCH", `Scanned Lot "${record.name}" is not in the pick list for this location.`);
-                         }
-                         return; // BLOCK
-                     }
-                 } else {
-                     // Product Scan
-                     validLine = this.bayaniSnapshot.lines.find(l => 
-                         (l.product_id === record.id || l.product_barcode === barcode) && 
-                         l.location_id === this.currentLocationId
-                     );
-                     
-                     if (!validLine) {
-                          // Check if valid product but WRONG location
-                          const otherLocLine = this.bayaniSnapshot.lines.find(l => (l.product_id === record.id || l.product_barcode === barcode));
-                          if (otherLocLine) {
-                              this._bayaniShowError("WRONG LOCATION", "Item cannot be added: this product does not belong to this location.");
-                          } else {
-                              this._bayaniShowError("UNAUTHORIZED PRODUCT", "Product not found in this picking.");
-                          }
-                          return; // BLOCK
-                     }
-                     
-                     // Lot Requirement Check
-                     if (record.tracking === 'lot' || record.tracking === 'serial') {
-                          this._bayaniShowError("LOT SCAN REQUIRED", "This product is tracked. Please scan the specific Lot/Serial barcode.");
-                          return; // BLOCK
-                     }
-                 }
-                 
-                 // Quantity Check (Pre-Server)
-                 if (validLine.qty_done >= validLine.qty_reserved) {
-                      // Check for ANY space in this location for this product/lot
-                      const remaining = this.bayaniSnapshot.lines
-                        .filter(l => l.product_id === validLine.product_id && l.location_id === this.currentLocationId && ((!l.lot_id) || l.lot_id === validLine.lot_id))
-                        .reduce((sum, l) => sum + (l.qty_reserved - l.qty_done), 0);
-                      
-                      if (remaining <= 0) {
-                          this._bayaniShowError("QUANTITY EXCEEDED", `Required quantity already scanned.`);
-                          return; // BLOCK
-                      }
-                 }
-                 
-                 // Internal Handler
-                 return this._processValidScan(barcode, record, validLine);
-             }
-             
-             // If record exists but is NOT Location/Product/Lot (e.g. Package)
-             // User requested strict rejection of anything not in list.
-             this._bayaniShowError("UNAUTHORIZED TYPE", "Scanned item type is not allowed in this strict mode.");
-             return; // BLOCK
-        } else {
-            // result is null (Not in Cache)
-            
-            // EXCEPTION: Allow Odoo Commands (e.g. O-CMD.VALIDATE)
-            // Commands usually fail cache lookup. We must let them pass to super.
-            if (barcode && (barcode.startsWith("O-CMD") || barcode.startsWith("O-BTN"))) {
-                return super.scanBarcode(barcode);
-            }
-            
+        // 4. If not found in cache, reject immediately
+        if (!result || !result.record) {
+            console.log("[Bayani] BLOCKING: Barcode not found in cache:", barcode);
             this._bayaniShowError("UNAUTHORIZED ITEM", "Item not recognized or not in picking.");
             return; // BLOCK
         }
 
-        // UNREACHABLE (Filtered above) but strictly:
-        // return super.scanBarcode(barcode); 
+        const { record, type } = result;
+        console.log("[Bayani] Record type:", type, "Record model:", record._name);
+
+        // 5. LOCATION VALIDATION - Check snapshot FIRST
+        if (record._name === 'stock.location' || type === 'location') {
+            console.log("[Bayani] ===== LOCATION SCAN DETECTED =====");
+            console.log("[Bayani] Location name:", record.display_name);
+            console.log("[Bayani] Location ID:", record.id);
+            console.log("[Bayani] Location barcode:", record.barcode);
+            
+            // Get all valid source location IDs from snapshot
+            const validLocationIds = [...new Set(this.bayaniSnapshot.lines.map(l => l.location_id))];
+            const validLocationNames = [...new Set(this.bayaniSnapshot.lines.map(l => l.location_name))];
+            
+            console.log("[Bayani] Valid source location IDs in picking:", validLocationIds);
+            console.log("[Bayani] Valid source location NAMES in picking:", validLocationNames);
+            console.log("[Bayani] Scanned location ID:", record.id);
+            console.log("[Bayani] Checking if", record.id, "is in", validLocationIds);
+            
+            // CHECK 1: Is this location in the picking at all?
+            const isValidLocation = validLocationIds.includes(record.id);
+            console.log("[Bayani] Is location valid?", isValidLocation);
+            
+            if (!isValidLocation) {
+                console.log("[Bayani] ===== BLOCKING: INVALID LOCATION =====");
+                console.log("[Bayani] Scanned:", record.display_name, "(ID:", record.id, ")");
+                console.log("[Bayani] Expected one of:", validLocationNames.join(", "));
+                
+                this._bayaniShowError("WRONG LOCATION", 
+                    `Location "${record.display_name}" is not part of this picking.\n\nValid source locations:\n${this._getValidLocationNames()}`);
+                return; // BLOCK - DO NOT PROCEED
+            }
+            
+            // CHECK 2: Does this location have pending work?
+            const pendingLocationIds = this.bayaniSnapshot.lines
+                .filter(l => l.qty_done < l.qty_reserved)
+                .map(l => l.location_id);
+            
+            console.log("[Bayani] Locations with pending work:", pendingLocationIds);
+            const hasPendingWork = pendingLocationIds.includes(record.id);
+            console.log("[Bayani] Does location have pending work?", hasPendingWork);
+            
+            if (!hasPendingWork) {
+                console.log("[Bayani] ===== BLOCKING: NO PENDING WORK =====");
+                this._bayaniShowError("LOCATION COMPLETE", 
+                    `All items from "${record.display_name}" have already been picked.`);
+                return; // BLOCK
+            }
+
+            // SUCCESS: Lock to this location
+            console.log("[Bayani] ===== SUCCESS: LOCKING TO LOCATION =====");
+            console.log("[Bayani] Locked to:", record.display_name, "(ID:", record.id, ")");
+            this.currentLocationId = record.id;
+            this.env.services.notification.add(_t(`Locked to ${record.display_name}`), { type: 'success' });
+            return; // Handled
+        }
+        
+        // 6. PRODUCT/LOT VALIDATION
+        const isProductOrLot = record._name === 'stock.lot' || type === 'lot' || record._name === 'product.product' || type === 'product';
+        if (isProductOrLot) {
+            if (!this.currentLocationId) {
+                 this._bayaniShowError("ACTION REQUIRED", "Please scan a source location first.");
+                 return; // BLOCK
+            }
+
+            // STRICT FILTERING
+            // We must find a valid line in our snapshot that matches:
+            // 1. The scanned product/lot
+            // 2. The CURRENT locked location
+            
+            let validLine = null;
+            
+            if (record._name === 'stock.lot' || type === 'lot') {
+                validLine = this.bayaniSnapshot.lines.find(l => 
+                    l.lot_id === record.id && 
+                    l.location_id === this.currentLocationId
+                );
+                
+                if (!validLine) {
+                    // Check if it's a valid lot but WRONG location
+                    const otherLocLine = this.bayaniSnapshot.lines.find(l => l.lot_id === record.id);
+                    if (otherLocLine) {
+                        this._bayaniShowError("WRONG LOCATION", "Item cannot be added: this product does not belong to this location.");
+                    } else {
+                        this._bayaniShowError("LOT MISMATCH", `Scanned Lot "${record.name}" is not in the pick list for this location.`);
+                    }
+                    return; // BLOCK
+                }
+            } else {
+                // Product Scan
+                validLine = this.bayaniSnapshot.lines.find(l => 
+                    (l.product_id === record.id || l.product_barcode === barcode) && 
+                    l.location_id === this.currentLocationId
+                );
+                
+                if (!validLine) {
+                     // Check if valid product but WRONG location
+                     const otherLocLine = this.bayaniSnapshot.lines.find(l => (l.product_id === record.id || l.product_barcode === barcode));
+                     if (otherLocLine) {
+                         this._bayaniShowError("WRONG LOCATION", "Item cannot be added: this product does not belong to this location.");
+                     } else {
+                         this._bayaniShowError("UNAUTHORIZED PRODUCT", "Product not found in this picking.");
+                     }
+                     return; // BLOCK
+                }
+                
+                // Lot Requirement Check
+                if (record.tracking === 'lot' || record.tracking === 'serial') {
+                     this._bayaniShowError("LOT SCAN REQUIRED", "This product is tracked. Please scan the specific Lot/Serial barcode.");
+                     return; // BLOCK
+                }
+            }
+            
+            // Quantity Check (Pre-Server)
+            if (validLine.qty_done >= validLine.qty_reserved) {
+                 // Check for ANY space in this location for this product/lot
+                 const remaining = this.bayaniSnapshot.lines
+                   .filter(l => l.product_id === validLine.product_id && l.location_id === this.currentLocationId && ((!l.lot_id) || l.lot_id === validLine.lot_id))
+                   .reduce((sum, l) => sum + (l.qty_reserved - l.qty_done), 0);
+                 
+                 if (remaining <= 0) {
+                     this._bayaniShowError("QUANTITY EXCEEDED", `Required quantity already scanned.`);
+                     return; // BLOCK
+                 }
+            }
+            
+            // Internal Handler
+            return this._processValidScan(barcode, record, validLine);
+        }
+        
+        // 7. If record exists but is NOT Location/Product/Lot (e.g. Package)
+        // User requested strict rejection of anything not in list.
+        this._bayaniShowError("UNAUTHORIZED TYPE", "Scanned item type is not allowed in this strict mode.");
+        return; // BLOCK
+    },
+
+    _getValidLocationNames() {
+        if (!this.bayaniSnapshot || !this.bayaniSnapshot.lines) return "None";
+        const locationNames = [...new Set(this.bayaniSnapshot.lines.map(l => l.location_name))];
+        return locationNames.map(name => `  • ${name}`).join('\n');
     },
     
     // Internal handler for valid scans (replacing _onBarcodeScanned logic)
