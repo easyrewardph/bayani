@@ -354,8 +354,14 @@ patch(BarcodePickingModel.prototype, {
             
             if (!isValidLocation) {
                 console.log("[Bayani] BLOCKING: Scanned location not in picking list.");
+                console.log("[Bayani] Valid IDs:", validLocationIds);
+                console.log("[Bayani] Scanned ID:", record.id);
+                
+                // Construct a helpful error message
+                const validNames = [...new Set(this.bayaniSnapshot.lines.map(l => l.location_name))].join(", ");
+                
                 this._bayaniShowError("INVALID LOCATION", 
-                    "The scanned barcode location is not in the picking list.");
+                    `The scanned barcode location "${record.display_name}" is not in the picking list.\n\nValid locations are: ${validNames}`);
                 return; // BLOCK
             }
             
@@ -528,8 +534,12 @@ patch(BarcodePickingModel.prototype, {
     // OLD METHOD (Disabled/Redirected)
     // -------------------------------------------------------------------------
     async _onBarcodeScanned(barcode) {
-        // This should not be called for products anymore if scanBarcode is working.
-        // But if super.scanBarcode calls it...
+        console.log("[Bayani] _onBarcodeScanned trigger with:", barcode);
+        // Force Strict Scan Entry Point
+        if (this.scanBarcode) {
+             await this.scanBarcode(barcode);
+             return; 
+        }
         return super._onBarcodeScanned(barcode);
     },
 
