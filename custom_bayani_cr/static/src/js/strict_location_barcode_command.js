@@ -27,7 +27,6 @@ const strictLocationGuard = {
         let record = null;
         let type = null;
         
-        // Use model cache to check if it's a location WITHOUT side effects
         if (model.cache && model.cache.getRecordByBarcode) {
             const result = await model.cache.getRecordByBarcode(barcode);
             if (result) {
@@ -43,12 +42,16 @@ const strictLocationGuard = {
         
         // 3. STRICT VALIDATION LOGIC
         // It IS a location. Now check if it belongs to the picking.
-        const getId = (f) => Array.isArray(f) ? f[0] : f;
+        const getId = (f) => {
+             if (!f) return null;
+             if (Array.isArray(f)) return f[0];
+             return f;
+        };
         
-        const lines = model.lines || []; // Access loaded lines
+        // Use model.lines which contains the fully loaded move lines
+        const lines = model.lines || []; 
         const activeLines = lines.filter(l => getId(l.picking_id) === activePickingId);
         
-        // Determine Validation Scope (Source vs Dest)
         const rootData = model.root.data || {};
         const pickingType = rootData.picking_type_code || 'internal';
         const isPacking = pickingType === 'incoming';
@@ -58,14 +61,16 @@ const strictLocationGuard = {
                       : getId(l.location_id)
         ).filter(id => id);
         
+        // console.log(`[Bayani] Valid Locations for Picking ${activePickingId}:`, validLocIds);
+        
         // 4. THE DECISION
         if (!validLocIds.includes(record.id)) {
-            // It is a location, but NOT allowed.
-            // We MATCH this command so we can block it.
+            // It is a location, but NOT allowed in this picking.
+            // Match = TRUE to block it.
             return true;
         }
         
-        // It is a valid location. Return false so the Default Location Command can handle it.
+        // Valid location. Match = FALSE to allow default handler.
         return false;
     },
     
