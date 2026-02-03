@@ -139,7 +139,11 @@ class StockPicking(models.Model):
             'location_id': picking.location_id.id,
             'location_name': picking.location_id.display_name,
             'picking_type_code': picking.picking_type_id.code,
-            'lines': []
+            'lines': [],
+            'moveLines': [],
+            'locationsByBarcode': {},
+            'productsByBarcode': {},
+            'lotsByName': {},
         }
         
         for line in picking.move_line_ids:
@@ -158,11 +162,14 @@ class StockPicking(models.Model):
                 'product_id': line.product_id.id,
                 'product_barcode': line.product_id.barcode,
                 'product_name': line.product_id.display_name,
+                'product_tracking': line.product_id.tracking,
                 'lot_id': line.lot_id.id or False,
                 'lot_name': line.lot_id.name or False,
                 'qty_reserved': line.reserved_uom_qty, 
+                'product_uom_qty': line.product_uom_qty or line.reserved_uom_qty,
                 'qty_done': line.qty_done,
                 'location_id': line.location_id.id, 
+                'location_barcode': line.location_id.barcode,
                 'location_name': line.location_id.display_name,
                 'location_dest_id': line.location_dest_id.id, 
                 'location_dest_name': line.location_dest_id.display_name,
@@ -170,6 +177,26 @@ class StockPicking(models.Model):
                 'state': line.state,
             }
             snapshot['lines'].append(line_data)
+            snapshot['moveLines'].append({
+                'product_id': line.product_id.id,
+                'location_id': line.location_id.id,
+                'location_barcode': line.location_id.barcode,
+                'qty_reserved': line.reserved_uom_qty,
+                'product_uom_qty': line.product_uom_qty or line.reserved_uom_qty,
+                'qty_done': line.qty_done,
+                'lot_id': line.lot_id.id or False,
+                'lot_name': line.lot_id.name or False,
+                'product_tracking': line.product_id.tracking,
+            })
+            if line.location_id.barcode:
+                snapshot['locationsByBarcode'][line.location_id.barcode] = line.location_id.id
+            if line.product_id.barcode:
+                snapshot['productsByBarcode'][line.product_id.barcode] = line.product_id.id
+            if line.lot_id and line.lot_id.name:
+                snapshot['lotsByName'][line.lot_id.name] = {
+                    'id': line.lot_id.id,
+                    'product_id': line.product_id.id,
+                }
             
         return {'status': 'success', 'data': snapshot}
 

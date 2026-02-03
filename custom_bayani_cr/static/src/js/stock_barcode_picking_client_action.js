@@ -103,6 +103,8 @@ patch(BarcodePickingModel.prototype, {
             const result = await this.orm.call('stock.picking', 'get_picking_snapshot', [pickingId]);
             if (result.status === 'success') {
                 this.bayaniSnapshot = result.data;
+                this.activeLocationId = null;
+                this.currentLocationId = null;
                 console.log("[Bayani] Snapshot Loaded:", this.bayaniSnapshot);
                 this.env.services.notification.add(_t("Bayani V8 Registry Active"), { type: 'success' });
                 
@@ -251,134 +253,64 @@ patch(BarcodePickingModel.prototype, {
         try {
             console.log("[Bayani] STRICT _onBarcodeScanned:", barcode);
 
-            // Sanitize Input (Null bytes removal)
-            if (typeof barcode === 'string') {
-                barcode = barcode.replace(/\0/g, '').trim();
-            }
+            barcode = this._normalizeBarcode(barcode);
 
-            const picking = this.record; 
-            const moveLines = picking.move_line_ids.records || picking.move_line_ids; 
-
-            // 1. Logic Check - System Ready?
-            // If picking data isn't fully loaded, we can't validate. Fail loud.
-            if (!picking || !picking.location_id) {
-                 this.env.services.notification.add(
-                    "❌ System Error: Picking data not loaded. Please reload.",
+            if (!this.bayaniSnapshot) {
+                this.env.services.notification.add(
+                    "❌ System Error: Snapshot not loaded. Please reload.",
                     { type: "danger" }
                 );
                 return;
             }
 
-            /* ----------------------------------------------------
-             * 1️⃣ STRICT LOCATION VALIDATION
-             * ---------------------------------------------------- */
-            /* ----------------------------------------------------
-             * 1️⃣ STRICT LOCATION VALIDATION
-             * ---------------------------------------------------- */
-            // Step 1: Gather allowed locations from move lines
-             // Step 1: Gather allowed locations from move lines
-            // Use this.lines (the loaded model data) instead of raw picking.move_line_ids
-            const sourceLines = this.lines || (this.page && this.page.lines) || [];
-            
-            const allowedLocationIds = sourceLines
-                .map(line => line.location_id?.id || line.location_id?.[0])
-                .filter(Boolean); // Filter out nulls/undefined
-                
-            // Debugging
-            console.log("[Bayani] Allowed Locations:", allowedLocationIds);
-
-            const location = await this.env.services.orm.searchRead(
-                "stock.location",
-                [["barcode", "=", barcode]],
-                ["id", "display_name"],
-                { limit: 1 }
-            );
-
-            if (location && location.length) {
-                const scannedLocationId = location[0].id;
-
-                if (!allowedLocationIds.includes(scannedLocationId)) {
-                    this.env.services.notification.add(
-                        `❌ Invalid Location Scan. Allowed locations: ${allowedLocationIds.length}`,
-                        { type: "danger" }
-                    );
-                    return; // ⛔ BLOCK HERE
+            // 1) Location scan must come first and gets locked
+            if (this._isLocationBarcode(barcode)) {
+                const locId = this.bayaniSnapshot.locationsByBarcode[barcode];
+                if (this.activeLocationId && this.activeLocationId !== locId) {
+                    await this._showBayaniStopDialog("Location is locked. Clear it before changing.");
+                    return;
                 }
-                // Valid location? Pass to super for default handling (e.g. setting source)
-                return await super._onBarcodeScanned(barcode);
+                this.activeLocationId = locId;
+                this.currentLocationId = locId;
+                this._toast?.(`Location set: ${barcode}`);
+                return;
             }
 
-            /* ----------------------------------------------------
-             * 2️⃣ STRICT PRODUCT VALIDATION
-             * ---------------------------------------------------- */
-            const product = await this.env.services.orm.searchRead(
-                "product.product",
-                [["barcode", "=", barcode]],
-                ["id", "display_name", "tracking"],
-                { limit: 1 }
-            );
-
-            if (product && product.length) {
-                 const scannedProductId = product[0].id;
-                 // Step 3 (from user req): Check if scanned barcode is a product
-                 const validProductIds = sourceLines
-                    .map(line => line.product_id?.id || line.product_id?.[0])
-                    .filter(Boolean);
-                 
-                 if (!validProductIds.includes(scannedProductId)) {
-                    this.env.services.notification.add(
-                        "❌ Product not part of this picking",
-                        { type: "danger" }
-                    );
-                    return; // ⛔ BLOCK
-                 }
-                 
-                 // If strictly matched, pass to super
-                 return await super._onBarcodeScanned(barcode);
-            }
-
-            /* ----------------------------------------------------
-             * 3️⃣ STRICT LOT VALIDATION
-             * ---------------------------------------------------- */
-            const lots = await this.env.services.orm.searchRead(
-                "stock.lot",
-                [["name", "=", barcode]],
-                ["id", "product_id", "name"],
-                { limit: 1 }
-            );
-
-            if (lots && lots.length) {
-                const scannedLotId = lots[0].id;
-                
-                // Step 2: Gather allowed lots from move lines
-                const allowedLotIds = sourceLines
-                    .map(line => line.lot_id?.id || line.lot_id?.[0])
-                    .filter(Boolean);
-
-                if (!allowedLotIds.includes(scannedLotId)) {
-                    this.env.services.notification.add(
-                        "❌ Lot not assigned to this picking",
-                        { type: "danger" }
-                    );
-                    return; // ⛔ BLOCK
+            // 2) Product / Lot scan requires a locked location
+            if (this._isProductBarcode(barcode) || this._isLotBarcode(barcode)) {
+                if (!this.activeLocationId) {
+                    await this._showBayaniStopDialog("Scan location first.");
+                    return;
                 }
-                
-                // If strictly matched, pass to super
-                return await super._onBarcodeScanned(barcode);
+
+                let productId = null;
+                let lotId = null;
+                if (this._isLotBarcode(barcode)) {
+                    const lotInfo = this.bayaniSnapshot.lotsByName[barcode];
+                    productId = lotInfo.product_id;
+                    lotId = lotInfo.id;
+                } else {
+                    productId = this.bayaniSnapshot.productsByBarcode[barcode];
+                }
+
+                const ok = this._isProductAllowedInActiveLocation(productId, lotId);
+                if (!ok) {
+                    await this._showBayaniStopDialog(
+                        "Rejected: product not reserved in this location."
+                    );
+                    return;
+                }
+
+                await this._processValidScan(barcode);
+                return;
             }
-            
-            // 4. UNKNOWN BARCODE
+
+            // 3) Unknown barcode
             if (!barcode.startsWith("O-CMD") && !barcode.startsWith("O-BTN")) {
-                  this.env.services.notification.add(
-                    `❌ Unknown Barcode: ${barcode}`,
-                    { type: "danger" }
-                );
-                return; // Block unknown garbage
+                await this._showBayaniStopDialog("Unknown barcode.");
+                return;
             }
 
-            /* ----------------------------------------------------
-             * ✅ COMMANDS / DEFAULT FALLBACK
-             * ---------------------------------------------------- */
             return await super._onBarcodeScanned(barcode);
 
         } catch (error) {
@@ -393,6 +325,54 @@ patch(BarcodePickingModel.prototype, {
     // -------------------------------------------------------------------------
     // HELPERS
     // -------------------------------------------------------------------------
+
+    _normalizeBarcode(barcode) {
+        if (typeof barcode !== 'string') return '';
+        return barcode.replace(/\0/g, '').trim();
+    },
+
+    _isLocationBarcode(barcode) {
+        return !!this.bayaniSnapshot?.locationsByBarcode?.[barcode];
+    },
+
+    _isProductBarcode(barcode) {
+        return !!this.bayaniSnapshot?.productsByBarcode?.[barcode];
+    },
+
+    _isLotBarcode(barcode) {
+        return !!this.bayaniSnapshot?.lotsByName?.[barcode];
+    },
+
+    _isProductAllowedInActiveLocation(productId, lotId = null) {
+        const locId = this.activeLocationId;
+        if (!productId || !locId) return false;
+
+        const lines = (this.bayaniSnapshot?.moveLines || []).filter((ml) => {
+            const locationMatch = ml.location_id === locId;
+            const productMatch = ml.product_id === productId;
+            const qtyMatch = (ml.qty_reserved > 0 || ml.product_uom_qty > 0);
+            const notDone = ml.qty_done < ml.product_uom_qty;
+            if (!locationMatch || !productMatch || !qtyMatch || !notDone) return false;
+
+            if (ml.product_tracking === 'lot' || ml.product_tracking === 'serial') {
+                if (!lotId) return false;
+                return ml.lot_id === lotId;
+            }
+            return true;
+        });
+
+        return lines.length > 0;
+    },
+
+    async _showBayaniStopDialog(message) {
+        this.env.services.dialog.add(ConfirmationDialog, {
+            title: _t("STOP"),
+            body: message,
+            confirm: () => {},
+            confirmLabel: _t("OK"),
+            cancel: false,
+        });
+    },
 
     async _processValidScan(barcode, record) {
           const scanEntry = {
