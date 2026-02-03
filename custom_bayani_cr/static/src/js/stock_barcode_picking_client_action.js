@@ -305,9 +305,9 @@ patch(BarcodePickingModel.prototype, {
             const cleaned = this._normalizeBarcode(barcode);
 
             if (!this.snapshot) {
-                this.env.services.notification.add(
+                this._bayaniNotify(
                     "❌ System Error: Snapshot not loaded. Please reload.",
-                    { type: "danger" }
+                    "danger"
                 );
                 return;
             }
@@ -366,10 +366,18 @@ patch(BarcodePickingModel.prototype, {
 
         } catch (error) {
             console.error("[Bayani] Scan Error:", error);
-            this.env.services.notification.add(
+            this._bayaniNotify(
                 "❌ System Error during scan validation. Check console.",
-                { type: "danger" }
+                "danger"
             );
+        }
+    },
+
+    _bayaniNotify(message, type = "info") {
+        if (this.env?.services?.notification) {
+            this.env.services.notification.add(message, { type });
+        } else {
+            console.warn("[Bayani] Notification:", message);
         }
     },
 
@@ -387,6 +395,10 @@ patch(BarcodePickingModel.prototype, {
     },
 
     async _showBayaniStopDialog(message) {
+        if (!this.env?.services?.dialog) {
+            console.warn("[Bayani] STOP:", message);
+            return;
+        }
         this.env.services.dialog.add(ConfirmationDialog, {
             title: _t("STOP"),
             body: message,
