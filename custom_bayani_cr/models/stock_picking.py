@@ -105,7 +105,10 @@ class StockPicking(models.Model):
 
         # ===== STEP 3: Quantity Validation & Update =====
         # Find a line that needs this item
-        assignable_line = valid_move_lines.filtered(lambda l: l.qty_done < l.reserved_uom_qty)
+        def _reserved_qty(line):
+            return getattr(line, 'reserved_uom_qty', None) or getattr(line, 'reserved_qty', None) or line.product_uom_qty
+
+        assignable_line = valid_move_lines.filtered(lambda l: l.qty_done < _reserved_qty(l))
         
         if not assignable_line:
              self.action_log_scan_event(barcode, 'FAILURE', "Qty Exceeded")
@@ -118,10 +121,11 @@ class StockPicking(models.Model):
         msg = f"Scanned: {product.display_name}" + (f" (Lot: {scanned_lot.name})" if scanned_lot else "")
         self.action_log_scan_event(barcode, 'SUCCESS', msg)
         
+        reserved_qty = _reserved_qty(line)
         return {
             'status': 'success',
             'message': msg,
-            'remaining': line.reserved_uom_qty - line.qty_done
+            'remaining': reserved_qty - line.qty_done
         }
 
     @api.model
@@ -129,7 +133,7 @@ class StockPicking(models.Model):
         """
         Return a complete snapshot of the picking for local validation.
         """
-        picking = self.browse(picking_id)
+        picking = self.sudo().browse(picking_id)
         if not picking.exists():
             return {'status': 'error', 'message': 'Picking not found'}
             
@@ -147,6 +151,7 @@ class StockPicking(models.Model):
         }
         
         for line in picking.move_line_ids:
+            reserved_qty = getattr(line, 'reserved_uom_qty', None) or getattr(line, 'reserved_qty', None) or line.product_uom_qty
             domain = [
                 ('location_id', '=', line.location_id.id),
                 ('product_id', '=', line.product_id.id),
@@ -154,7 +159,7 @@ class StockPicking(models.Model):
             if line.lot_id:
                 domain.append(('lot_id', '=', line.lot_id.id))
             
-            quants = self.env['stock.quant'].search(domain)
+            quants = self.env['stock.quant'].sudo().search(domain)
             available_qty = sum(quants.mapped('quantity'))
             
             line_data = {
@@ -165,8 +170,8 @@ class StockPicking(models.Model):
                 'product_tracking': line.product_id.tracking,
                 'lot_id': line.lot_id.id or False,
                 'lot_name': line.lot_id.name or False,
-                'qty_reserved': line.reserved_uom_qty, 
-                'product_uom_qty': line.product_uom_qty or line.reserved_uom_qty,
+                'qty_reserved': reserved_qty,
+                'product_uom_qty': line.product_uom_qty or reserved_qty,
                 'qty_done': line.qty_done,
                 'location_id': line.location_id.id, 
                 'location_barcode': line.location_id.barcode,
@@ -181,8 +186,8 @@ class StockPicking(models.Model):
                 'product_id': line.product_id.id,
                 'location_id': line.location_id.id,
                 'location_barcode': line.location_id.barcode,
-                'qty_reserved': line.reserved_uom_qty,
-                'product_uom_qty': line.product_uom_qty or line.reserved_uom_qty,
+                'qty_reserved': reserved_qty,
+                'product_uom_qty': line.product_uom_qty or reserved_qty,
                 'qty_done': line.qty_done,
                 'lot_id': line.lot_id.id or False,
                 'lot_name': line.lot_id.name or False,
