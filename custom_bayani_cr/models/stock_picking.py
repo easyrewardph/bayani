@@ -70,15 +70,29 @@ class StockPicking(models.Model):
         # Note: The JS passes `location_dest_id` as the CURRENT SCANNED LOCATION ID.
         # But for 'internal/outgoing' pickings, this MUST be the picking.location_id (Source).
         # We enforce that here.
+        print(f"location_dest_id: {location_dest_id}")
+        print(f"picking.move_line_ids: {picking.move_line_ids}")
+        print(f"picking.move_line_ids.mapped('location_id.id'): {picking.move_line_ids.mapped('location_id.id')}")
+        print(f"picking.move_line_ids.mapped('location_id.display_name'): {picking.move_line_ids.mapped('location_id.display_name')}")
+        print(f"picking.move_line_ids.mapped('location_id.barcode'): {picking.move_line_ids.mapped('location_id.barcode')}")
+        print(f"picking.move_line_ids.mapped('location_id.name'): {picking.move_line_ids.mapped('location_id.name')}")
+        print(f"picking.move_line_ids.mapped('location_id.code'): {picking.move_line_ids.mapped('location_id.code')}")
+        print(f"picking.move_line_ids.mapped('location_id.location_id'): {picking.move_line_ids.mapped('location_id.location_id')}")
         if location_dest_id:
             # We enforce that validation considers all source locations in move lines
             valid_location_ids = picking.move_line_ids.mapped('location_id.id')
+            print(f"valid_location_ids: {valid_location_ids}")
             if int(location_dest_id) not in valid_location_ids:
                  self.action_log_scan_event(barcode, 'FAILURE', "Location Mismatch")
                  raise UserError(_("Invalid Location. Standard Picking requires scanning items from one of the Source Locations: %s") % (", ".join(picking.move_line_ids.mapped('location_id.display_name'))))
+            print("[Bayani] Location check passed. Proceeding to product validation.")
+        else:
+            print("[Bayani] No location_dest_id provided; skipping location check.")
 
         # 2. Product Check (Must be in move lines)
         valid_move_lines = picking.move_line_ids.filtered(lambda l: l.product_id == product)
+        print(f"[Bayani] Product scan: {product.display_name} (id={product.id})")
+        print(f"[Bayani] Matching move lines count: {len(valid_move_lines)}")
         if not valid_move_lines:
             self.action_log_scan_event(barcode, 'FAILURE', "Product not in picking")
             raise UserError(_("Product '%s' is not part of this picking.") % product.display_name)
@@ -94,6 +108,7 @@ class StockPicking(models.Model):
                  self.action_log_scan_event(barcode, 'FAILURE', "Lot unauthorized")
                  raise UserError(_("Lot '%s' is not reserved for this picking.") % scanned_lot.name)
             valid_move_lines = lot_lines
+            print(f"[Bayani] Lot scan: {scanned_lot.name} (id={scanned_lot.id})")
         
         elif product.tracking in ('lot', 'serial'):
              # If product is tracked but we scanned a product barcode (not lot)
@@ -106,7 +121,11 @@ class StockPicking(models.Model):
         # ===== STEP 3: Quantity Validation & Update =====
         # Find a line that needs this item
         def _reserved_qty(line):
-            return getattr(line, 'reserved_uom_qty', None) or getattr(line, 'reserved_qty', None) or line.product_uom_qty
+            return (
+                getattr(line, 'reserved_uom_qty', None)
+                or getattr(line, 'reserved_qty', None)
+                or (line.move_id.product_uom_qty if line.move_id else 0.0)
+            )
 
         assignable_line = valid_move_lines.filtered(lambda l: l.qty_done < _reserved_qty(l))
         
@@ -151,7 +170,11 @@ class StockPicking(models.Model):
         }
         
         for line in picking.move_line_ids:
-            reserved_qty = getattr(line, 'reserved_uom_qty', None) or getattr(line, 'reserved_qty', None) or line.product_uom_qty
+            reserved_qty = (
+                getattr(line, 'reserved_uom_qty', None)
+                or getattr(line, 'reserved_qty', None)
+                or (line.move_id.product_uom_qty if line.move_id else 0.0)
+            )
             domain = [
                 ('location_id', '=', line.location_id.id),
                 ('product_id', '=', line.product_id.id),
@@ -171,7 +194,7 @@ class StockPicking(models.Model):
                 'lot_id': line.lot_id.id or False,
                 'lot_name': line.lot_id.name or False,
                 'qty_reserved': reserved_qty,
-                'product_uom_qty': line.product_uom_qty or reserved_qty,
+                'product_uom_qty': (line.move_id.product_uom_qty if line.move_id else 0.0) or reserved_qty,
                 'qty_done': line.qty_done,
                 'location_id': line.location_id.id, 
                 'location_barcode': line.location_id.barcode,
@@ -187,7 +210,7 @@ class StockPicking(models.Model):
                 'location_id': line.location_id.id,
                 'location_barcode': line.location_id.barcode,
                 'qty_reserved': reserved_qty,
-                'product_uom_qty': line.product_uom_qty or reserved_qty,
+                'product_uom_qty': (line.move_id.product_uom_qty if line.move_id else 0.0) or reserved_qty,
                 'qty_done': line.qty_done,
                 'lot_id': line.lot_id.id or False,
                 'lot_name': line.lot_id.name or False,
