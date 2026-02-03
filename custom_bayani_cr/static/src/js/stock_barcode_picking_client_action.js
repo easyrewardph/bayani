@@ -104,6 +104,7 @@ patch(BarcodePickingModel.prototype, {
             if (result.status === 'success') {
                 this.bayaniSnapshot = result.data;
                 this.snapshot = result.data;
+                this._buildAllowedLocations();
                 this.activeLocationId = null;
                 this.currentLocationId = null;
                 console.log("[Bayani] Snapshot Loaded:", this.bayaniSnapshot);
@@ -323,6 +324,44 @@ patch(BarcodePickingModel.prototype, {
     // -------------------------------------------------------------------------
     // HELPERS
     // -------------------------------------------------------------------------
+
+    _buildAllowedLocations() {
+        this.bayaniAllowedLocationIds = new Set(
+            (this.snapshot?.moveLines || [])
+                .map((ml) => ml.location_id)
+                .filter(Boolean)
+        );
+        console.log(
+            "[Bayani] Allowed source locations:",
+            [...this.bayaniAllowedLocationIds]
+        );
+    },
+
+    async _processBarcode(barcode) {
+        const cleaned = this._normalizeBarcode(barcode);
+        const locId = this.snapshot?.locationsByBarcode?.[cleaned];
+        if (locId) {
+            const allowed = this.bayaniAllowedLocationIds?.has(locId);
+            console.log(
+                "[Bayani] Location scanned",
+                cleaned,
+                "locId=",
+                locId,
+                "allowed=",
+                allowed
+            );
+            if (!allowed) {
+                await this._showBayaniStopDialog(
+                    "Rejected: this location is not part of this transfer."
+                );
+                return;
+            }
+            this.activeLocationId = locId;
+            this.currentLocationId = locId;
+        }
+
+        return await super._processBarcode(barcode);
+    },
 
     _normalizeBarcode(barcode) {
         if (typeof barcode !== 'string') return '';
