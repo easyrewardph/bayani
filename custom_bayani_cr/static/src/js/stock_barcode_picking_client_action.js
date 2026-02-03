@@ -26,6 +26,38 @@ patch(BarcodePickingModel.prototype, {
         await this._initEncryption();
         await super.load(...arguments);
         console.log("[Bayani] super.load() finished");
+        
+        console.warn("=================================================");
+        console.warn("   BAYANI DEBUG DUMP (ON LOAD)                   ");
+        console.warn("=================================================");
+        console.log("Model (this):", this);
+        console.log("Record (this.record):", this.record);
+        console.log("Groups (this.groups):", this.groups);
+        console.log("Lines (this.lines):", this.lines); // Often the main source of truth in Barcode
+        console.log("Page Lines (this.page.lines):", this.page ? this.page.lines : "No Page Loaded");
+        console.log("Env Model Lines (this.env.model.lines):", this.env.model ? this.env.model.lines : "No Model in Env");
+        console.log("Move Lines (record.move_line_ids):", this.record ? this.record.move_line_ids : "No Record");
+
+        // --- BAYANI DETAILED LINE DUMP ---
+        const linesToPrint = this.lines || (this.env.model && this.env.model.lines) || [];
+        if (linesToPrint.length > 0) {
+            console.groupCollapsed("📦 BAYANI PRODUCT-LOCATION MAPPING");
+            console.table(linesToPrint.map(l => ({
+                Product: l.product_id.display_name || l.product_id[1],
+                'Desired Location': l.location_id.display_name || l.location_id[1],
+                'Qty Reserved': l.reserved_uom_qty || l.product_uom_qty
+            })));
+            console.groupEnd();
+            
+            // Also print linearly for easier reading if table is collapsed/complex
+            linesToPrint.forEach(line => {
+                const prodName = line.product_id ? (line.product_id.display_name || line.product_id[1]) : "Unknown Product";
+                const locName = line.location_id ? (line.location_id.display_name || line.location_id[1]) : "Unknown Location";
+                console.log(`Product: %c${prodName}%c | Desired Location: %c${locName}`, "font-weight: bold; color: #007bff", "", "font-weight: bold; color: #28a745");
+            });
+        }
+        // ---------------------------------
+
         await this._bayaniInitialize();
     },
 
@@ -299,7 +331,7 @@ patch(BarcodePickingModel.prototype, {
 
                 if (!allowedLocationIds.includes(scannedLocationId)) {
                     this.env.services.notification.add(
-                        `❌ Invalid Location Scan. Allowed locations: ${allowedLocationIds.length}`,
+                        "You are trying to select a location which is not in this picking list!",
                         { type: "danger" }
                     );
                     return; // ⛔ BLOCK HERE

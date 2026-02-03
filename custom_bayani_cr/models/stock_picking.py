@@ -75,7 +75,7 @@ class StockPicking(models.Model):
             valid_location_ids = picking.move_line_ids.mapped('location_id.id')
             if int(location_dest_id) not in valid_location_ids:
                  self.action_log_scan_event(barcode, 'FAILURE', "Location Mismatch")
-                 raise UserError(_("Invalid Location. Standard Picking requires scanning items from one of the Source Locations: %s") % (", ".join(picking.move_line_ids.mapped('location_id.display_name'))))
+                 raise UserError(_("You are trying to select a location which is not in this picking list!"))
 
         # 2. Product Check (Must be in move lines)
         valid_move_lines = picking.move_line_ids.filtered(lambda l: l.product_id == product)
