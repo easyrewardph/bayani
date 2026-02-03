@@ -31,7 +31,7 @@
         ],
         'web.assets_backend': [
              'custom_bayani_cr/static/src/js/stock_barcode_picking_client_action.js',
-             'custom_bayani_cr/static/src/js/strict_location_barcode_command.js',
+
              'custom_bayani_cr/static/src/xml/stock_barcode_line.xml',
         ],
         'web.report_assets_common': [
