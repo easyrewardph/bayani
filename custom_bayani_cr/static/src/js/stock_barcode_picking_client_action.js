@@ -373,7 +373,7 @@ patch(BarcodePickingModel.prototype, {
             }
 
             // 3) Unknown barcode
-            await this._showBayaniStopDialog("Unknown barcode.");
+            await this._showBayaniStopDialog("Rejected: this location does not belong to this transfer.");
             return;
 
         } catch (error) {
