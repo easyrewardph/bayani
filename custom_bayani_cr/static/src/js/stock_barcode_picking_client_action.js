@@ -269,7 +269,13 @@ patch(BarcodePickingModel.prototype, {
             /* ----------------------------------------------------
              * 1️⃣ STRICT LOCATION VALIDATION
              * ---------------------------------------------------- */
-            const allowedLocationId = picking.location_id && picking.location_id[0];
+            /* ----------------------------------------------------
+             * 1️⃣ STRICT LOCATION VALIDATION
+             * ---------------------------------------------------- */
+            // Step 1: Gather allowed locations from move lines
+            const allowedLocationIds = moveLines
+                .map(ml => ml.location_id?.[0] || (ml.data && ml.data.location_id?.[0]))
+                .filter(Boolean); // Filter out nulls/undefined
 
             const location = await this.env.services.orm.searchRead(
                 "stock.location",
@@ -281,9 +287,9 @@ patch(BarcodePickingModel.prototype, {
             if (location && location.length) {
                 const scannedLocationId = location[0].id;
 
-                if (scannedLocationId !== allowedLocationId) {
+                if (!allowedLocationIds.includes(scannedLocationId)) {
                     this.env.services.notification.add(
-                        `❌ Invalid Location Scan. Only allowed location: ${picking.location_id[1]}`,
+                        `❌ Invalid Location Scan. Allowed locations: ${allowedLocationIds.length}`,
                         { type: "danger" }
                     );
                     return; // ⛔ BLOCK HERE
@@ -304,11 +310,14 @@ patch(BarcodePickingModel.prototype, {
 
             if (product && product.length) {
                  const scannedProductId = product[0].id;
-                 const validProductIds = moveLines.map(ml => ml.data ? ml.data.product_id[0] : (ml.product_id ? ml.product_id[0] : null));
+                 // Step 3 (from user req): Check if scanned barcode is a product
+                 const validProductIds = moveLines
+                    .map(ml => ml.product_id?.[0] || (ml.data && ml.data.product_id?.[0]))
+                    .filter(Boolean);
                  
                  if (!validProductIds.includes(scannedProductId)) {
                     this.env.services.notification.add(
-                        "❌ Product not part of this Picking",
+                        "❌ Product not part of this picking",
                         { type: "danger" }
                     );
                     return; // ⛔ BLOCK
@@ -331,13 +340,14 @@ patch(BarcodePickingModel.prototype, {
             if (lots && lots.length) {
                 const scannedLotId = lots[0].id;
                 
+                // Step 2: Gather allowed lots from move lines
                 const allowedLotIds = moveLines
-                    .filter(ml => ml.data ? ml.data.lot_id : ml.lot_id)
-                    .map(ml => ml.data ? ml.data.lot_id[0] : ml.lot_id[0]);
+                    .map(ml => ml.lot_id?.[0] || (ml.data && ml.data.lot_id?.[0]))
+                    .filter(Boolean);
 
                 if (!allowedLotIds.includes(scannedLotId)) {
                     this.env.services.notification.add(
-                        "❌ Lot not reserved for this Picking",
+                        "❌ Lot not assigned to this picking",
                         { type: "danger" }
                     );
                     return; // ⛔ BLOCK
