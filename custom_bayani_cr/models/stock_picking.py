@@ -1,4 +1,5 @@
-from odoo import models, api, fields
+from odoo import models, api, fields, _
+from odoo.exceptions import UserError
 import os
 import datetime
 import logging
@@ -14,28 +15,14 @@ class StockPicking(models.Model):
     def action_log_scan_event(self, barcode, status, message):
         """
         Log scan events to a daily log file in the 'scanlog' directory.
-        :param barcode: The scanned barcode string
-        :param status: 'SUCCESS' or 'FAILURE'
-        :param message: Description of the event
         """
         try:
-            # Define log directory
-            base_dir = os.path.dirname(os.path.dirname(__file__)) # custom_bayani_cr/
-            # User asked for "scanlog" folder. Let's put it in the module root or project root?
-            # Request: "create a folder named scanlog"
-            # I will put it in the module root for now, or the odoo root?
-            # "if folder not exist then create"
-            # Safest is the module directory or a specific data directory. 
-            # Given the context "folder named scanlog", I'll try to put it in the directory above the module if possible, 
-            # or just inside the module to be safe with permissions. 
-            # Actually, standard Odoo structure suggests avoiding writing inside module code. 
-            # However, for this quick request, I'll place it in the module root: `custom_bayani_cr/scanlog/`.
-            
+            base_dir = os.path.dirname(os.path.dirname(__file__)) 
             log_dir = os.path.join(base_dir, 'scanlog')
             if not os.path.exists(log_dir):
                 os.makedirs(log_dir)
 
-            today = datetime.date.today().isoformat() # YYYY-MM-DD
+            today = datetime.date.today().isoformat()
             log_file_path = os.path.join(log_dir, f"{today}.log")
             
             timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -50,221 +37,94 @@ class StockPicking(models.Model):
             _logger.error(f"Failed to log scan event: {str(e)}")
             return False
 
-    def _check_strict_compliance(self, location_dest_id=None):
-        """
-        DISABLED TEMPORARILY (2026-01-23)
-        Reason: Blocking urgent deliveries; incorrect field usage (move_line.product_uom_qty doesn't exist)
-        The correct field is on stock.move.product_uom_qty, not stock.move.line
-        Re-enable only after:
-        - Proper UX feedback mechanism
-        - Correct field mapping (use move_id.product_uom_qty or reserved_uom_qty)
-        - Better error messages with line IDs
-        """
-        # Original implementation commented out - see above for reasons
-        return
-
     def button_validate(self):
-        """
-        STRICT COMPLIANCE CHECK TEMPORARILY DISABLED (2026-01-23)
-        Reason: Blocking urgent deliveries; incorrect field usage (move_line.product_uom_qty)
-        Re-enable only after proper UX + correct field mapping (use move.product_uom_qty)
-        """
-        # Emergency fix: Bypass strict validation to unblock production transfers
-        # Original strict check in _check_strict_compliance() has been disabled
         return super(StockPicking, self).button_validate()
 
     @api.model
     def action_scan_product_strict(self, picking_id, barcode, location_dest_id, expected_lot_id=None):
         """
         Strict validation of scanned barcode against picking plan.
-        
-        Returns structured response with error codes:
-        - PICKING_NOT_FOUND: Invalid picking ID
-        - BARCODE_NOT_FOUND: Barcode not in product or lot tables
-        - PRODUCT_NOT_IN_PICKING: Product exists but not part of this transfer
-        - LOCATION_INVALID: Product assigned to different location
-        - LOT_MISMATCH: Scanned lot doesn't match expected lot for the line
-        - LOT_REQUIRED: Product requires lot tracking but no lot scanned
-        - QUANTITY_EXCEEDED: All reserved quantity already scanned
+        Raises UserError if validation fails.
         """
         picking = self.browse(picking_id)
         if not picking.exists():
-            return {
-                'status': 'error',
-                'error_code': 'PICKING_NOT_FOUND',
-                'message': 'Picking not found.',
-                'details': {'picking_id': picking_id}
-            }
+            raise UserError(_("Picking not found."))
 
-        # ===== STEP 1: Barcode Lookup (Product OR Lot) =====
-        product = None
+        # ===== STEP 1: Barcode Lookup =====
+        product = self.env['product.product'].search([('barcode', '=', barcode)], limit=1)
         scanned_lot = None
         
-        # First, try to find as product barcode
-        product = self.env['product.product'].search([('barcode', '=', barcode)], limit=1)
-        
-        # If not found as product, try to find as lot/serial barcode
         if not product:
+            # If not a product barcode, check if it is a lot barcode
             scanned_lot = self.env['stock.lot'].search([('name', '=', barcode)], limit=1)
             if scanned_lot:
                 product = scanned_lot.product_id
-            else:
-                # Also check lot by barcode field if exists (for GS1-128 barcodes)
-                scanned_lot = self.env['stock.lot'].search([('ref', '=', barcode)], limit=1)
-                if scanned_lot:
-                    product = scanned_lot.product_id
-        
+            
         if not product:
-            self.action_log_scan_event(barcode, 'FAILURE', f'Barcode {barcode} not found in products or lots.')
-            return {
-                'status': 'error',
-                'error_code': 'BARCODE_NOT_FOUND',
-                'message': f'Barcode "{barcode}" not found in system.',
-                'details': {
-                    'barcode': barcode,
-                    'searched_in': ['product.product.barcode', 'stock.lot.name', 'stock.lot.ref']
-                }
-            }
+            self.action_log_scan_event(barcode, 'FAILURE', "Barcode not found")
+            raise UserError(_("Barcode '%s' not found in system.") % barcode)
 
-        # ===== STEP 2: Product Existence in Picking =====
-        product_lines = picking.move_line_ids.filtered(lambda l: l.product_id == product)
+        # ===== STEP 2: Strict Context Checks =====
         
-        if not product_lines:
-            self.action_log_scan_event(barcode, 'FAILURE', f"Product {product.display_name} not in picking {picking.name}")
-            return {
-                'status': 'error',
-                'error_code': 'PRODUCT_NOT_IN_PICKING',
-                'message': f'Product "{product.display_name}" is not part of this transfer.',
-                'details': {
-                    'product_id': product.id,
-                    'product_name': product.display_name,
-                    'barcode': barcode,
-                    'picking_name': picking.name,
-                    'expected_products': [l.product_id.display_name for l in picking.move_line_ids]
-                }
-            }
+        # 1. Location Check (Strict Source)
+        # Note: The JS passes `location_dest_id` as the CURRENT SCANNED LOCATION ID.
+        # But for 'internal/outgoing' pickings, this MUST be the picking.location_id (Source).
+        # We enforce that here.
+        if location_dest_id and int(location_dest_id) != picking.location_id.id:
+             self.action_log_scan_event(barcode, 'FAILURE', "Location Mismatch")
+             raise UserError(_("Invalid Location. Standard Picking requires scanning items from the Source Location: %s") % picking.location_id.display_name)
 
-        # ===== STEP 3: Location Validation =====
-        valid_lines = product_lines.filtered(lambda l: l.location_dest_id.id == location_dest_id)
+        # 2. Product Check (Must be in move lines)
+        valid_move_lines = picking.move_line_ids.filtered(lambda l: l.product_id == product)
+        if not valid_move_lines:
+            self.action_log_scan_event(barcode, 'FAILURE', "Product not in picking")
+            raise UserError(_("Product '%s' is not part of this picking.") % product.display_name)
+
+        # 3. Lot Check
+        if scanned_lot:
+            # If we scanned a lot, it MUST be in the reserved move lines
+            # STRICT: Try to find a line with this specific lot
+            lot_lines = valid_move_lines.filtered(lambda l: l.lot_id == scanned_lot)
+            if not lot_lines:
+                 # Check if the picking allows this lot (maybe unreserved but valid?)
+                 # The requirement says: "ONLY lots already reserved on move lines are allowed"
+                 self.action_log_scan_event(barcode, 'FAILURE', "Lot unauthorized")
+                 raise UserError(_("Lot '%s' is not reserved for this picking.") % scanned_lot.name)
+            valid_move_lines = lot_lines
         
-        if not valid_lines:
-            expected_locations = list(set([l.location_dest_id.display_name for l in product_lines]))
-            scanned_location = self.env['stock.location'].browse(location_dest_id)
-            self.action_log_scan_event(barcode, 'FAILURE', f"Wrong location for {product.display_name}")
-            return {
-                'status': 'error',
-                'error_code': 'LOCATION_INVALID',
-                'message': f'Product "{product.display_name}" is assigned to a different location.',
-                'details': {
-                    'product_name': product.display_name,
-                    'scanned_location': scanned_location.display_name if scanned_location else str(location_dest_id),
-                    'expected_locations': expected_locations,
-                    'barcode': barcode
-                }
-            }
+        elif product.tracking in ('lot', 'serial'):
+             # If product is tracked but we scanned a product barcode (not lot)
+             # We should probably ask for lot. But if the user code calls this, they might expect it to work?
+             # Requirement: "Odoo Stock Barcode (Picking & Packing) ... strict barcode scanning"
+             # If tracked, we usually require lot scan. 
+             # Let's enforce it if the logic implies we need a lot.
+             raise UserError(_("Product '%s' is tracked. Please scan a Lot/Serial Number.") % product.display_name)
 
-        # ===== STEP 4: Lot/Serial Validation =====
-        # Check if product requires lot tracking
-        requires_lot = product.tracking in ('lot', 'serial')
-        
-        if requires_lot:
-            if not scanned_lot and not expected_lot_id:
-                self.action_log_scan_event(barcode, 'FAILURE', f"Lot required for {product.display_name}")
-                return {
-                    'status': 'error',
-                    'error_code': 'LOT_REQUIRED',
-                    'message': f'Product "{product.display_name}" requires lot/serial tracking. Please scan the lot barcode.',
-                    'details': {
-                        'product_name': product.display_name,
-                        'tracking_type': product.tracking,
-                        'barcode': barcode
-                    }
-                }
-            
-            # If we have a scanned lot, validate it against expected lines
-            if scanned_lot:
-                lot_lines = valid_lines.filtered(lambda l: l.lot_id.id == scanned_lot.id)
-                if not lot_lines:
-                    expected_lots = [l.lot_id.name for l in valid_lines if l.lot_id]
-                    self.action_log_scan_event(barcode, 'FAILURE', f"Lot mismatch: scanned {scanned_lot.name}")
-                    return {
-                        'status': 'error',
-                        'error_code': 'LOT_MISMATCH',
-                        'message': f'Lot "{scanned_lot.name}" does not match the expected lot for this transfer.',
-                        'details': {
-                            'product_name': product.display_name,
-                            'scanned_lot': scanned_lot.name,
-                            'expected_lots': expected_lots if expected_lots else ['No specific lot assigned'],
-                            'barcode': barcode
-                        }
-                    }
-                valid_lines = lot_lines
-            
-            # If expected_lot_id is passed from frontend, validate against it
-            elif expected_lot_id:
-                lot_lines = valid_lines.filtered(lambda l: l.lot_id.id == expected_lot_id)
-                if not lot_lines:
-                    expected_lot = self.env['stock.lot'].browse(expected_lot_id)
-                    actual_lots = [l.lot_id.name for l in valid_lines if l.lot_id]
-                    self.action_log_scan_event(barcode, 'FAILURE', f"Lot mismatch: expected {expected_lot.name}")
-                    return {
-                        'status': 'error',
-                        'error_code': 'LOT_MISMATCH',
-                        'message': f'Expected lot "{expected_lot.name}" but this product is assigned to different lots.',
-                        'details': {
-                            'product_name': product.display_name,
-                            'expected_lot': expected_lot.name,
-                            'actual_lots': actual_lots,
-                            'barcode': barcode
-                        }
-                    }
-                valid_lines = lot_lines
-
-        # ===== STEP 5: Quantity Validation =====
-        assignable_line = valid_lines.filtered(lambda l: l.qty_done < l.reserved_uom_qty)
+        # ===== STEP 3: Quantity Validation & Update =====
+        # Find a line that needs this item
+        assignable_line = valid_move_lines.filtered(lambda l: l.qty_done < l.reserved_uom_qty)
         
         if not assignable_line:
-            total_reserved = sum(valid_lines.mapped('reserved_uom_qty'))
-            total_done = sum(valid_lines.mapped('qty_done'))
-            self.action_log_scan_event(barcode, 'FAILURE', f"Qty exceeded for {product.display_name}")
-            return {
-                'status': 'error',
-                'error_code': 'QUANTITY_EXCEEDED',
-                'message': f'All reserved quantity for "{product.display_name}" has already been scanned.',
-                'details': {
-                    'product_name': product.display_name,
-                    'total_reserved': total_reserved,
-                    'total_scanned': total_done,
-                    'barcode': barcode,
-                    'lot_name': scanned_lot.name if scanned_lot else None
-                }
-            }
-
-        # ===== STEP 6: Update Quantity =====
-        line_to_update = assignable_line[0]
-        line_to_update.qty_done += 1
+             self.action_log_scan_event(barcode, 'FAILURE', "Qty Exceeded")
+             raise UserError(_("All reserved quantity for '%s' has already been scanned.") % product.display_name)
         
-        self.action_log_scan_event(barcode, 'SUCCESS', f"Scanned {product.display_name}" + (f" Lot: {scanned_lot.name}" if scanned_lot else ""))
+        # Apply Mutation
+        line = assignable_line[0]
+        line.qty_done += 1
+        
+        msg = f"Scanned: {product.display_name}" + (f" (Lot: {scanned_lot.name})" if scanned_lot else "")
+        self.action_log_scan_event(barcode, 'SUCCESS', msg)
         
         return {
             'status': 'success',
-            'error_code': None,
-            'message': f'Scanned: {product.display_name}' + (f' (Lot: {scanned_lot.name})' if scanned_lot else ''),
-            'details': {
-                'line_id': line_to_update.id,
-                'product_name': product.display_name,
-                'lot_name': scanned_lot.name if scanned_lot else None,
-                'new_qty_done': line_to_update.qty_done,
-                'reserved_qty': line_to_update.reserved_uom_qty,
-                'remaining': line_to_update.reserved_uom_qty - line_to_update.qty_done
-            }
+            'message': msg,
+            'remaining': line.reserved_uom_qty - line.qty_done
         }
 
     @api.model
     def get_picking_snapshot(self, picking_id):
         """
         Return a complete snapshot of the picking for local validation.
-        Includes real-time stock availability check.
         """
         picking = self.browse(picking_id)
         if not picking.exists():
@@ -279,17 +139,7 @@ class StockPicking(models.Model):
             'lines': []
         }
         
-        # Aggregate lines by product/lot to check strict availability
         for line in picking.move_line_ids:
-            # Check real-time availability at source location
-            quant = self.env['stock.quant'].search([
-                ('location_id', '=', line.location_id.id),
-                ('product_id', '=', line.product_id.id),
-                ('lot_id', '=', line.lot_id.id) if line.lot_id else (1, '=', 1)
-            ], limit=1)
-            
-            # Sum up quantity if multiple quants exist
-            # Better approach for availability:
             domain = [
                 ('location_id', '=', line.location_id.id),
                 ('product_id', '=', line.product_id.id),
@@ -307,11 +157,11 @@ class StockPicking(models.Model):
                 'product_name': line.product_id.display_name,
                 'lot_id': line.lot_id.id or False,
                 'lot_name': line.lot_id.name or False,
-                'qty_reserved': line.reserved_uom_qty, # This is the "Required" for this specific move line
+                'qty_reserved': line.reserved_uom_qty, 
                 'qty_done': line.qty_done,
-                'location_id': line.location_id.id, # Expected Source
+                'location_id': line.location_id.id, 
                 'location_name': line.location_id.display_name,
-                'location_dest_id': line.location_dest_id.id, # Expected Destination
+                'location_dest_id': line.location_dest_id.id, 
                 'location_dest_name': line.location_dest_id.display_name,
                 'available_qty_at_source': available_qty,
                 'state': line.state,
@@ -322,10 +172,6 @@ class StockPicking(models.Model):
 
     @api.model
     def process_offline_scans(self, picking_id, scans):
-        """
-        Process a batch of offline scans.
-        scans: list of { 'barcode': str, 'location_id': int, 'timestamp': str, 'qty': float, 'scan_id': str (optional) }
-        """
         picking = self.browse(picking_id)
         if not picking.exists():
             return {'status': 'error', 'message': 'Picking not found'}
@@ -333,8 +179,6 @@ class StockPicking(models.Model):
         results = []
         for scan in scans:
             try:
-                # Reuse strict logic or call standard process
-                # We reuse action_scan_product_strict as it encapsulates our validation logic
                 res = self.action_scan_product_strict(picking.id, scan['barcode'], scan.get('location_id'))
                 results.append({
                     'scan_id': scan.get('scan_id'),
@@ -343,6 +187,7 @@ class StockPicking(models.Model):
                     'message': res.get('message')
                 })
             except Exception as e:
+                # Capture UserError message here
                 results.append({
                     'scan_id': scan.get('scan_id'),
                     'barcode': scan['barcode'], 
@@ -351,4 +196,3 @@ class StockPicking(models.Model):
                 })
         
         return {'status': 'success', 'results': results}
-
