@@ -103,6 +103,7 @@ patch(BarcodePickingModel.prototype, {
             const result = await this.orm.call('stock.picking', 'get_picking_snapshot', [pickingId]);
             if (result.status === 'success') {
                 this.bayaniSnapshot = result.data;
+                this.snapshot = result.data;
                 this.activeLocationId = null;
                 this.currentLocationId = null;
                 console.log("[Bayani] Snapshot Loaded:", this.bayaniSnapshot);
@@ -255,7 +256,7 @@ patch(BarcodePickingModel.prototype, {
 
             barcode = this._normalizeBarcode(barcode);
 
-            if (!this.bayaniSnapshot) {
+            if (!this.snapshot) {
                 this.env.services.notification.add(
                     "❌ System Error: Snapshot not loaded. Please reload.",
                     { type: "danger" }
@@ -263,40 +264,41 @@ patch(BarcodePickingModel.prototype, {
                 return;
             }
 
-            // 1) Location scan must come first and gets locked
-            if (this._isLocationBarcode(barcode)) {
-                const locId = this.bayaniSnapshot.locationsByBarcode[barcode];
-                if (this.activeLocationId && this.activeLocationId !== locId) {
-                    await this._showBayaniStopDialog("Location is locked. Clear it before changing.");
+            // 1) LOCATION SCAN
+            const locId = this.snapshot.locationsByBarcode?.[barcode];
+            if (locId) {
+                const allowed = (this.snapshot.moveLines || []).some(
+                    (ml) => ml.location_id === locId
+                );
+                if (!allowed) {
+                    await this._showBayaniStopDialog(
+                        "Rejected: this location does not belong to this transfer."
+                    );
                     return;
                 }
+
                 this.activeLocationId = locId;
                 this.currentLocationId = locId;
-                this._toast?.(`Location set: ${barcode}`);
                 return;
             }
 
-            // 2) Product / Lot scan requires a locked location
-            if (this._isProductBarcode(barcode) || this._isLotBarcode(barcode)) {
+            // 2) PRODUCT SCAN
+            const productId = this.snapshot.productsByBarcode?.[barcode];
+            if (productId) {
                 if (!this.activeLocationId) {
                     await this._showBayaniStopDialog("Scan location first.");
                     return;
                 }
 
-                let productId = null;
-                let lotId = null;
-                if (this._isLotBarcode(barcode)) {
-                    const lotInfo = this.bayaniSnapshot.lotsByName[barcode];
-                    productId = lotInfo.product_id;
-                    lotId = lotInfo.id;
-                } else {
-                    productId = this.bayaniSnapshot.productsByBarcode[barcode];
-                }
+                const ok = (this.snapshot.moveLines || []).some((ml) =>
+                    ml.product_id === productId &&
+                    ml.location_id === this.activeLocationId &&
+                    (ml.qty_done || 0) < (ml.product_uom_qty || 0)
+                );
 
-                const ok = this._isProductAllowedInActiveLocation(productId, lotId);
                 if (!ok) {
                     await this._showBayaniStopDialog(
-                        "Rejected: product not reserved in this location."
+                        "Rejected: this product is not reserved in the scanned location."
                     );
                     return;
                 }
@@ -306,12 +308,8 @@ patch(BarcodePickingModel.prototype, {
             }
 
             // 3) Unknown barcode
-            if (!barcode.startsWith("O-CMD") && !barcode.startsWith("O-BTN")) {
-                await this._showBayaniStopDialog("Unknown barcode.");
-                return;
-            }
-
-            return await super._onBarcodeScanned(barcode);
+            await this._showBayaniStopDialog("Unknown barcode.");
+            return;
 
         } catch (error) {
             console.error("[Bayani] Scan Error:", error);
@@ -332,36 +330,11 @@ patch(BarcodePickingModel.prototype, {
     },
 
     _isLocationBarcode(barcode) {
-        return !!this.bayaniSnapshot?.locationsByBarcode?.[barcode];
+        return !!this.snapshot?.locationsByBarcode?.[barcode];
     },
 
     _isProductBarcode(barcode) {
-        return !!this.bayaniSnapshot?.productsByBarcode?.[barcode];
-    },
-
-    _isLotBarcode(barcode) {
-        return !!this.bayaniSnapshot?.lotsByName?.[barcode];
-    },
-
-    _isProductAllowedInActiveLocation(productId, lotId = null) {
-        const locId = this.activeLocationId;
-        if (!productId || !locId) return false;
-
-        const lines = (this.bayaniSnapshot?.moveLines || []).filter((ml) => {
-            const locationMatch = ml.location_id === locId;
-            const productMatch = ml.product_id === productId;
-            const qtyMatch = (ml.qty_reserved > 0 || ml.product_uom_qty > 0);
-            const notDone = ml.qty_done < ml.product_uom_qty;
-            if (!locationMatch || !productMatch || !qtyMatch || !notDone) return false;
-
-            if (ml.product_tracking === 'lot' || ml.product_tracking === 'serial') {
-                if (!lotId) return false;
-                return ml.lot_id === lotId;
-            }
-            return true;
-        });
-
-        return lines.length > 0;
+        return !!this.snapshot?.productsByBarcode?.[barcode];
     },
 
     async _showBayaniStopDialog(message) {
