@@ -339,6 +339,13 @@ patch(BarcodePickingModel.prototype, {
                 this.currentLocationId = locId;
                 return;
             }
+            const locationPrefix = this.snapshot.location_name || "";
+            if (locationPrefix && cleaned.startsWith(locationPrefix)) {
+                await this._showBayaniStopDialog(
+                    "Rejected: this location does not belong to this transfer."
+                );
+                return;
+            }
 
             // 2) PRODUCT SCAN
             const productId = this.snapshot.productsByBarcode?.[cleaned];
