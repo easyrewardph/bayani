@@ -304,7 +304,8 @@ patch(BarcodePickingModel.prototype, {
             console.log("[Bayani] STRICT handler HIT for barcode:", barcode);
             const cleaned = this._normalizeBarcode(barcode);
 
-            if (!this.snapshot) {
+            const ready = await this._ensureBayaniSnapshot();
+            if (!ready) {
                 this._bayaniNotify(
                     "❌ System Error: Snapshot not loaded. Please reload.",
                     "danger"
@@ -371,6 +372,22 @@ patch(BarcodePickingModel.prototype, {
                 "danger"
             );
         }
+    },
+
+    async _ensureBayaniSnapshot() {
+        if (this.snapshot) return true;
+        if (!this.record?.id) return false;
+        if (!this._bayaniInitPromise) {
+            this._bayaniInitPromise = (async () => {
+                try {
+                    await this._bayaniInitialize();
+                } finally {
+                    this._bayaniInitPromise = null;
+                }
+            })();
+        }
+        await this._bayaniInitPromise;
+        return !!this.snapshot;
     },
 
     _bayaniNotify(message, type = "info") {
