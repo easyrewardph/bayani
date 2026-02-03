@@ -273,9 +273,16 @@ patch(BarcodePickingModel.prototype, {
              * 1️⃣ STRICT LOCATION VALIDATION
              * ---------------------------------------------------- */
             // Step 1: Gather allowed locations from move lines
-            const allowedLocationIds = moveLines
-                .map(ml => ml.location_id?.[0] || (ml.data && ml.data.location_id?.[0]))
+             // Step 1: Gather allowed locations from move lines
+            // Use this.lines (the loaded model data) instead of raw picking.move_line_ids
+            const sourceLines = this.lines || (this.page && this.page.lines) || [];
+            
+            const allowedLocationIds = sourceLines
+                .map(line => line.location_id?.id || line.location_id?.[0])
                 .filter(Boolean); // Filter out nulls/undefined
+                
+            // Debugging
+            console.log("[Bayani] Allowed Locations:", allowedLocationIds);
 
             const location = await this.env.services.orm.searchRead(
                 "stock.location",
@@ -311,8 +318,8 @@ patch(BarcodePickingModel.prototype, {
             if (product && product.length) {
                  const scannedProductId = product[0].id;
                  // Step 3 (from user req): Check if scanned barcode is a product
-                 const validProductIds = moveLines
-                    .map(ml => ml.product_id?.[0] || (ml.data && ml.data.product_id?.[0]))
+                 const validProductIds = sourceLines
+                    .map(line => line.product_id?.id || line.product_id?.[0])
                     .filter(Boolean);
                  
                  if (!validProductIds.includes(scannedProductId)) {
@@ -341,8 +348,8 @@ patch(BarcodePickingModel.prototype, {
                 const scannedLotId = lots[0].id;
                 
                 // Step 2: Gather allowed lots from move lines
-                const allowedLotIds = moveLines
-                    .map(ml => ml.lot_id?.[0] || (ml.data && ml.data.lot_id?.[0]))
+                const allowedLotIds = sourceLines
+                    .map(line => line.lot_id?.id || line.lot_id?.[0])
                     .filter(Boolean);
 
                 if (!allowedLotIds.includes(scannedLotId)) {
