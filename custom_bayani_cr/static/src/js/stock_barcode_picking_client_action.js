@@ -17,7 +17,7 @@ patch(BarcodePickingModel.prototype, {
     // -------------------------------------------------------------------------
 
     async load() {
-        console.log("[Bayani] load() called");
+        // console.log("[Bayani] load() called");
         this.bayaniSnapshot = null;
         this.bayaniSession = null;
         this.encryptionKey = null;
@@ -25,7 +25,7 @@ patch(BarcodePickingModel.prototype, {
 
         await this._initEncryption();
         await super.load(...arguments);
-        console.log("[Bayani] super.load() finished");
+        // console.log("[Bayani] super.load() finished");
         await this._bayaniInitialize();
     },
 
@@ -107,7 +107,7 @@ patch(BarcodePickingModel.prototype, {
                 this._buildAllowedLocations();
                 this.activeLocationId = null;
                 this.currentLocationId = null;
-                console.log("[Bayani] Snapshot Loaded:", this.bayaniSnapshot);
+                // console.log("[Bayani] Snapshot Loaded:", this.bayaniSnapshot);
                 this._bayaniNotify(_t("Bayani V8 Registry Active"), "success");
                 
                 const blockage = this._bayaniCheckStockAvailability();
@@ -269,10 +269,10 @@ patch(BarcodePickingModel.prototype, {
                 .map((ml) => ml.location_id)
                 .filter(Boolean)
         );
-        console.log(
-            "[Bayani] Allowed source locations:",
-            [...this.bayaniAllowedLocationIds]
-        );
+        // console.log(
+        //     "[Bayani] Allowed source locations:",
+        //     [...this.bayaniAllowedLocationIds]
+        // );
     },
 
     async _processBarcode(barcode) {
@@ -305,7 +305,7 @@ patch(BarcodePickingModel.prototype, {
 
     async _bayaniStrictScan(barcode) {
         try {
-            console.log("[Bayani] STRICT handler HIT for barcode:", barcode);
+            // console.log("[Bayani] STRICT handler HIT for barcode:", barcode);
             const cleaned = this._normalizeBarcode(barcode);
 
             const ready = await this._ensureBayaniSnapshot();
@@ -321,14 +321,14 @@ patch(BarcodePickingModel.prototype, {
             const locId = this.snapshot.locationsByBarcode?.[cleaned];
             if (locId) {
                 const allowed = this.bayaniAllowedLocationIds?.has(locId);
-                console.log(
-                    "[Bayani] Location scanned",
-                    cleaned,
-                    "locId=",
-                    locId,
-                    "allowed=",
-                    allowed
-                );
+                // console.log(
+                //     "[Bayani] Location scanned",
+                //     cleaned,
+                //     "locId=",
+                //     locId,
+                //     "allowed=",
+                //     allowed
+                // );
                 if (!allowed) {
                     await this._showBayaniStopDialog(
                         "Rejected: this location does not belong to this transfer."
@@ -425,6 +425,9 @@ patch(BarcodePickingModel.prototype, {
     async _showBayaniStopDialog(message) {
         if (!this.env?.services?.dialog) {
             console.warn("[Bayani] STOP:", message);
+            if (typeof window !== "undefined" && typeof window.alert === "function") {
+                window.alert(message);
+            }
             return;
         }
         this.env.services.dialog.add(ConfirmationDialog, {
