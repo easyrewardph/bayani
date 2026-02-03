@@ -70,9 +70,12 @@ class StockPicking(models.Model):
         # Note: The JS passes `location_dest_id` as the CURRENT SCANNED LOCATION ID.
         # But for 'internal/outgoing' pickings, this MUST be the picking.location_id (Source).
         # We enforce that here.
-        if location_dest_id and int(location_dest_id) != picking.location_id.id:
-             self.action_log_scan_event(barcode, 'FAILURE', "Location Mismatch")
-             raise UserError(_("Invalid Location. Standard Picking requires scanning items from the Source Location: %s") % picking.location_id.display_name)
+        if location_dest_id:
+            # We enforce that validation considers all source locations in move lines
+            valid_location_ids = picking.move_line_ids.mapped('location_id.id')
+            if int(location_dest_id) not in valid_location_ids:
+                 self.action_log_scan_event(barcode, 'FAILURE', "Location Mismatch")
+                 raise UserError(_("Invalid Location. Standard Picking requires scanning items from one of the Source Locations: %s") % (", ".join(picking.move_line_ids.mapped('location_id.display_name'))))
 
         # 2. Product Check (Must be in move lines)
         valid_move_lines = picking.move_line_ids.filtered(lambda l: l.product_id == product)
