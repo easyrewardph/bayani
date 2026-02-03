@@ -70,29 +70,47 @@ class StockPicking(models.Model):
         # Note: The JS passes `location_dest_id` as the CURRENT SCANNED LOCATION ID.
         # But for 'internal/outgoing' pickings, this MUST be the picking.location_id (Source).
         # We enforce that here.
-        print(f"location_dest_id: {location_dest_id}")
-        print(f"picking.move_line_ids: {picking.move_line_ids}")
-        print(f"picking.move_line_ids.mapped('location_id.id'): {picking.move_line_ids.mapped('location_id.id')}")
-        print(f"picking.move_line_ids.mapped('location_id.display_name'): {picking.move_line_ids.mapped('location_id.display_name')}")
-        print(f"picking.move_line_ids.mapped('location_id.barcode'): {picking.move_line_ids.mapped('location_id.barcode')}")
-        print(f"picking.move_line_ids.mapped('location_id.name'): {picking.move_line_ids.mapped('location_id.name')}")
-        print(f"picking.move_line_ids.mapped('location_id.code'): {picking.move_line_ids.mapped('location_id.code')}")
-        print(f"picking.move_line_ids.mapped('location_id.location_id'): {picking.move_line_ids.mapped('location_id.location_id')}")
+        _logger.info("location_dest_id: %s", location_dest_id)
+        _logger.info("picking.move_line_ids: %s", picking.move_line_ids)
+        _logger.info(
+            "picking.move_line_ids.mapped('location_id.id'): %s",
+            picking.move_line_ids.mapped('location_id.id'),
+        )
+        _logger.info(
+            "picking.move_line_ids.mapped('location_id.display_name'): %s",
+            picking.move_line_ids.mapped('location_id.display_name'),
+        )
+        _logger.info(
+            "picking.move_line_ids.mapped('location_id.barcode'): %s",
+            picking.move_line_ids.mapped('location_id.barcode'),
+        )
+        _logger.info(
+            "picking.move_line_ids.mapped('location_id.name'): %s",
+            picking.move_line_ids.mapped('location_id.name'),
+        )
+        _logger.info(
+            "picking.move_line_ids.mapped('location_id.code'): %s",
+            picking.move_line_ids.mapped('location_id.code'),
+        )
+        _logger.info(
+            "picking.move_line_ids.mapped('location_id.location_id'): %s",
+            picking.move_line_ids.mapped('location_id.location_id'),
+        )
         if location_dest_id:
             # We enforce that validation considers all source locations in move lines
             valid_location_ids = picking.move_line_ids.mapped('location_id.id')
-            print(f"valid_location_ids: {valid_location_ids}")
+            _logger.info("valid_location_ids: %s", valid_location_ids)
             if int(location_dest_id) not in valid_location_ids:
                  self.action_log_scan_event(barcode, 'FAILURE', "Location Mismatch")
                  raise UserError(_("Invalid Location. Standard Picking requires scanning items from one of the Source Locations: %s") % (", ".join(picking.move_line_ids.mapped('location_id.display_name'))))
-            print("[Bayani] Location check passed. Proceeding to product validation.")
+            _logger.info("[Bayani] Location check passed. Proceeding to product validation.")
         else:
-            print("[Bayani] No location_dest_id provided; skipping location check.")
+            _logger.info("[Bayani] No location_dest_id provided; skipping location check.")
 
         # 2. Product Check (Must be in move lines)
         valid_move_lines = picking.move_line_ids.filtered(lambda l: l.product_id == product)
-        print(f"[Bayani] Product scan: {product.display_name} (id={product.id})")
-        print(f"[Bayani] Matching move lines count: {len(valid_move_lines)}")
+        _logger.info("[Bayani] Product scan: %s (id=%s)", product.display_name, product.id)
+        _logger.info("[Bayani] Matching move lines count: %s", len(valid_move_lines))
         if not valid_move_lines:
             self.action_log_scan_event(barcode, 'FAILURE', "Product not in picking")
             raise UserError(_("Product '%s' is not part of this picking.") % product.display_name)
@@ -108,7 +126,7 @@ class StockPicking(models.Model):
                  self.action_log_scan_event(barcode, 'FAILURE', "Lot unauthorized")
                  raise UserError(_("Lot '%s' is not reserved for this picking.") % scanned_lot.name)
             valid_move_lines = lot_lines
-            print(f"[Bayani] Lot scan: {scanned_lot.name} (id={scanned_lot.id})")
+            _logger.info("[Bayani] Lot scan: %s (id=%s)", scanned_lot.name, scanned_lot.id)
         
         elif product.tracking in ('lot', 'serial'):
              # If product is tracked but we scanned a product barcode (not lot)
