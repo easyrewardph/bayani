@@ -108,7 +108,7 @@ patch(BarcodePickingModel.prototype, {
                 this.activeLocationId = null;
                 this.currentLocationId = null;
                 console.log("[Bayani] Snapshot Loaded:", this.bayaniSnapshot);
-                this.env.services.notification.add(_t("Bayani V8 Registry Active"), { type: 'success' });
+                this._bayaniNotify(_t("Bayani V8 Registry Active"), "success");
                 
                 const blockage = this._bayaniCheckStockAvailability();
                 if (blockage) {
@@ -133,6 +133,10 @@ patch(BarcodePickingModel.prototype, {
     },
 
     _bayaniShowBlockDialog(title, body) {
+         if (!this.env?.services?.dialog) {
+             console.warn("[Bayani] BLOCK:", title, body);
+             return;
+         }
          this.env.services.dialog.add(ConfirmationDialog, {
             title: title,
             body: body,
