@@ -358,6 +358,8 @@ patch(BarcodePickingModel.prototype, {
                 }
                 this.activeLocationId = locId;
                 this.currentLocationId = locId;
+                const locName = this._getLocationName(locId) || cleaned;
+                this._bayaniNotify(`Scan a product from ${locName}`, "info");
                 return;
             }
             const locationPrefix = this.snapshot.location_name || "";
@@ -411,11 +413,19 @@ patch(BarcodePickingModel.prototype, {
                 return;
             }
 
-            // 3) Unknown barcode
+            // 3) Unknown / unmatched barcode
             if (this._bayaniDebug) {
                 console.log("[Bayani] Unknown barcode", cleaned);
             }
-            await this._showBayaniStopDialog("Rejected: this location does not belong to this transfer.");
+            if (this.activeLocationId) {
+                await this._showBayaniStopDialog(
+                    "Rejected: this product is not reserved in the scanned location."
+                );
+            } else {
+                await this._showBayaniStopDialog(
+                    "Rejected: barcode not part of this transfer."
+                );
+            }
             return;
 
         } catch (error) {
@@ -468,6 +478,11 @@ patch(BarcodePickingModel.prototype, {
     _normalizeBarcode(barcode) {
         if (typeof barcode !== 'string') return '';
         return barcode.replace(/\0/g, '').trim();
+    },
+
+    _getLocationName(locId) {
+        const line = (this.snapshot?.moveLines || []).find((ml) => ml.location_id === locId);
+        return line?.location_name || null;
     },
 
     _isLocationBarcode(barcode) {
