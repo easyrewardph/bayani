@@ -376,11 +376,13 @@ patch(BarcodePickingModel.prototype, {
                 return;
             }
 
-            // 2) PRODUCT SCAN
-            const productId = this.snapshot.productsByBarcode?.[cleaned];
+            // 2) LOT OR PRODUCT SCAN
+            const lotInfo = this.snapshot.lotsByName?.[cleaned];
+            const productId = lotInfo?.product_id || this.snapshot.productsByBarcode?.[cleaned];
+            const lotId = lotInfo?.id || null;
             if (productId) {
                 if (this._bayaniDebug) {
-                    console.log("[Bayani] Product scanned", { cleaned, productId });
+                    console.log("[Bayani] Product scanned", { cleaned, productId, lotId });
                 }
                 if (!this.activeLocationId) {
                     await this._showBayaniStopDialog("Scan location first.");
@@ -390,6 +392,7 @@ patch(BarcodePickingModel.prototype, {
                 const ok = (this.snapshot.moveLines || []).some((ml) =>
                     ml.product_id === productId &&
                     ml.location_id === this.activeLocationId &&
+                    (!lotId || ml.lot_id === lotId) &&
                     (ml.qty_done || 0) < (ml.product_uom_qty || 0)
                 );
 
@@ -397,6 +400,7 @@ patch(BarcodePickingModel.prototype, {
                     if (this._bayaniDebug) {
                         console.log("[Bayani] Product rejected at location", {
                             productId,
+                            lotId,
                             activeLocationId: this.activeLocationId,
                         });
                     }
