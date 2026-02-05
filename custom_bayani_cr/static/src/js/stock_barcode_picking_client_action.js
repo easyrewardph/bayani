@@ -589,30 +589,35 @@ patch(BarcodePickingModel.prototype, {
                   }
                    await this._bayaniSaveSession();
                    
-                   // MANUAL FRONTEND UPDATE
-                   const lines = (this.env && this.env.model && this.env.model.lines) || this.lines || [];
-                   const line = lines.find(l => 
-                       l.product_id.id === productId && 
-                       l.location_id.id === this.currentLocationId && 
-                       (!lotId || (l.lot_id && l.lot_id.id === lotId))
-                   );
-                   
-                   if (line) {
-                       line.qty_done = (line.qty_done || 0) + 1;
-                       console.log("[Bayani] Local line updated:", line);
-                       this.trigger('update');
-                   } else {
-                       console.warn("[Bayani] Line not found for local update, falling back to reload");
-                       await this.trigger('reload');
+                   // Refresh snapshot from server so UI shows correct quantities
+                   try {
+                       const result = await this.orm.call('stock.picking', 'get_picking_snapshot', [this.record.id]);
+                       if (result.status === 'success' && result.data) {
+                           this.snapshot = result.data;
+                           this.bayaniSnapshot = result.data;
+                       }
+                   } catch (e) {
+                       if (this._bayaniDebug) console.warn("[Bayani] Snapshot refresh failed", e);
                    }
+                   this.trigger('update');
+                   await this.trigger('reload');
 
                } else {
                  // Backend Rejected
                   console.error("[Bayani] Backend Rejected:", res.message);
                  this._bayaniShowError(res.error_code || "ERROR", res.message);
-                 // Remove the failed scan from session or mark failed? 
-                 // Keeping it in log but maybe we should revert the session add if we were strictly syncing?
-                 // For now, leaving it as history.
+                 // Refresh UI so quantity displayed matches backend (e.g. "already scanned" case)
+                 try {
+                     const result = await this.orm.call('stock.picking', 'get_picking_snapshot', [this.record.id]);
+                     if (result.status === 'success' && result.data) {
+                         this.snapshot = result.data;
+                         this.bayaniSnapshot = result.data;
+                         this.trigger('update');
+                         await this.trigger('reload');
+                     }
+                 } catch (e) {
+                     if (this._bayaniDebug) console.warn("[Bayani] Snapshot refresh after reject failed", e);
+                 }
              }
          } catch (e) {
              console.warn("Server unreachable", e);
@@ -623,6 +628,13 @@ patch(BarcodePickingModel.prototype, {
     },
 
     _bayaniShowError(title, body) {
+        if (!this.env?.services?.dialog) {
+            console.warn("[Bayani] Error:", title, body);
+            if (typeof window !== "undefined" && typeof window.alert === "function") {
+                window.alert(`${title}\n\n${body}`);
+            }
+            return;
+        }
         this.env.services.dialog.add(ConfirmationDialog, {
             title: title,
             body: body,
