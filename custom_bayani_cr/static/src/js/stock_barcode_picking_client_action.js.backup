@@ -571,30 +571,69 @@ patch(BarcodePickingModel.prototype, {
              const res = await this.orm.call('stock.picking', 'action_scan_product_strict', 
                 [this.record.id, barcode, this.currentLocationId]);
              
-              if (res.status === 'success') {
-                  const details = res.details || {};
-                  const productInfo = details.product || {};
-                  
-                  // Show Success Notification
-                  const successMsg = res.message || `✅ Product Scanned Successfully`;
-                  if (this.env?.services?.notification) {
-                      this.env.services.notification.add(successMsg, { type: 'success' });
-                  }
-                  
-                  // Mark scan as synced
-                  const lastScan = this.bayaniSession.scans.find(s => s.scan_id === scanEntry.scan_id);
-                  if (lastScan) { 
-                      lastScan.synced = true; 
-                      lastScan.lastSyncStatus = 'success'; 
-                  }
-                  await this._bayaniSaveSession();
-                  
-                  // Reload data from server to get updated quantities
-                  console.log("[Bayani] Reloading data from server...");
-                  await this.load();
-                  
-                  // Trigger UI update
-                  this.trigger('update');
+             if (res.status === 'success') {
+                 const details = res.details || {};
+                 const productInfo = details.product || {};
+                 
+                 // Show Success Notification
+                 const successMsg = res.message || `✅ Product Scanned Successfully`;
+                 if (this.env?.services?.notification) {
+                     this.env.services.notification.add(successMsg, { type: 'success' });
+                 }
+                 
+                 // Manual Local Update to avoid refresh
+                 const lines = this.lines || (this.env && this.env.model && this.env.model.lines) || (this.page && this.page.lines) || [];
+                 
+                 // Debug: Log what we are looking for
+                 console.log("[Bayani] Searching for line update:", { barcode, productId, lotId, locId: this.currentLocationId });
+
+                 // Try to find the line using passed IDs first (more robust), enable fallback to barcode
+                 let targetLine = lines.find((l) => {
+                     // Check Location First: Handle ID (int) vs [ID, Name] (array)
+                     const lLocId = l.location_id ? (typeof l.location_id === 'object' ? (l.location_id.id || l.location_id[0]) : l.location_id) : null;
+                     const locationMatch = !this.currentLocationId || (lLocId == this.currentLocationId);
+                     
+                     if (!locationMatch) return false;
+                     
+                     // Check Product/Lot
+                     if (productId) {
+                         const lProdId = l.product_id ? (typeof l.product_id === 'object' ? (l.product_id.id || l.product_id[0]) : l.product_id) : null;
+                         const lLotId = l.lot_id ? (typeof l.lot_id === 'object' ? (l.lot_id.id || l.lot_id[0]) : l.lot_id) : null;
+                         
+                         // Loose equality for IDs (string vs int safety)
+                         const pMatch = lProdId && (lProdId == productId);
+                         const lotMatch = !lotId || (lLotId && lLotId == lotId);
+                         return pMatch && lotMatch;
+                     } else {
+                         // fallback to barcode text match
+                         const productMatch = l.product_id && (l.product_id.barcode === barcode);
+                         const lotMatch = l.lot_id && l.lot_id.name === barcode;
+                         return productMatch || lotMatch;
+                     }
+                 });
+
+                 if (targetLine) {
+                      console.log("[Bayani] Local line found, updating:", targetLine);
+                      // Update Qty immediately
+                      targetLine.qty_done = (targetLine.qty_done || 0) + 1;
+                      targetLine.bayani_last_scan = scanEntry.timestamp;
+                      
+                      // Also update session scan status
+                      const lastScan = this.bayaniSession.scans.find(s => s.scan_id === scanEntry.scan_id);
+                      if (lastScan) { lastScan.synced = true; lastScan.lastSyncStatus = 'success'; }
+                      await this._bayaniSaveSession();
+
+                       // Force UI refresh using actionService.restore
+                       if (this.env?.services?.action) {
+                           this.env.services.action.restore(this.env.services.action.currentController.jsId);
+                       } else {
+                           await this.trigger('reload');
+                       }
+                 } else {
+                      // If line not found (maybe new line created by server?), reload
+                      console.log("[Bayani] Line not found locally, forcing reload...");
+                      await this.trigger('reload');
+                 }
              } else {
                  // Backend Rejected
                  this._bayaniShowError(res.error_code || "ERROR", res.message);
