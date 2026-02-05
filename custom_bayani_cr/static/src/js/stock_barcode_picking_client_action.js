@@ -1,6 +1,6 @@
 /** @odoo-module **/
 console.log("=================================================");
-console.log("   BAYANI CUSTOM BARCODE MODULE LOADING (V11)     ");
+console.log("   BAYANI CUSTOM BARCODE MODULE LOADING (V12)     ");
 console.log("=================================================");
 console.log("File: custom_bayani_cr/static/src/js/stock_barcode_picking_client_action.js");
 
@@ -589,9 +589,23 @@ patch(BarcodePickingModel.prototype, {
                   }
                    await this._bayaniSaveSession();
                    
-                   // Reload the entire view to get updated quantities from server
-                   console.log("[Bayani] Reloading view with updated data...");
-                   await this.trigger('reload');
+                   // MANUAL FRONTEND UPDATE
+                   const lines = (this.env && this.env.model && this.env.model.lines) || this.lines || [];
+                   const line = lines.find(l => 
+                       l.product_id.id === productId && 
+                       l.location_id.id === this.currentLocationId && 
+                       (!lotId || (l.lot_id && l.lot_id.id === lotId))
+                   );
+                   
+                   if (line) {
+                       line.qty_done = (line.qty_done || 0) + 1;
+                       console.log("[Bayani] Local line updated:", line);
+                       this.trigger('update');
+                   } else {
+                       console.warn("[Bayani] Line not found for local update, falling back to reload");
+                       await this.trigger('reload');
+                   }
+
                } else {
                  // Backend Rejected
                   console.error("[Bayani] Backend Rejected:", res.message);
