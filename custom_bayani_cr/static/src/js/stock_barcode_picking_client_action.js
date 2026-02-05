@@ -583,18 +583,27 @@ patch(BarcodePickingModel.prototype, {
                  
                  // Manual Local Update to avoid refresh
                  const lines = this.lines || (this.env && this.env.model && this.env.model.lines) || (this.page && this.page.lines) || [];
+                 
+                 // Debug: Log what we are looking for
+                 console.log("[Bayani] Searching for line update:", { barcode, productId, lotId, locId: this.currentLocationId });
+
                  // Try to find the line using passed IDs first (more robust), enable fallback to barcode
-                 const targetLine = lines.find((l) => {
-                     // Check Location First
-                     const locationMatch = !this.currentLocationId || (l.location_id && (l.location_id.id === this.currentLocationId || l.location_id[0] === this.currentLocationId));
+                 let targetLine = lines.find((l) => {
+                     // Check Location First: Handle ID (int) vs [ID, Name] (array)
+                     const lLocId = l.location_id ? (typeof l.location_id === 'object' ? (l.location_id.id || l.location_id[0]) : l.location_id) : null;
+                     const locationMatch = !this.currentLocationId || (lLocId == this.currentLocationId);
+                     
                      if (!locationMatch) return false;
                      
                      // Check Product/Lot
                      if (productId) {
-                         // precise match
-                         const pMatch = l.product_id && (l.product_id.id === productId || l.product_id[0] === productId);
-                         const lMatch = !lotId || (l.lot_id && (l.lot_id.id === lotId || l.lot_id[0] === lotId));
-                         return pMatch && lMatch;
+                         const lProdId = l.product_id ? (typeof l.product_id === 'object' ? (l.product_id.id || l.product_id[0]) : l.product_id) : null;
+                         const lLotId = l.lot_id ? (typeof l.lot_id === 'object' ? (l.lot_id.id || l.lot_id[0]) : l.lot_id) : null;
+                         
+                         // Loose equality for IDs (string vs int safety)
+                         const pMatch = lProdId && (lProdId == productId);
+                         const lotMatch = !lotId || (lLotId && lLotId == lotId);
+                         return pMatch && lotMatch;
                      } else {
                          // fallback to barcode text match
                          const productMatch = l.product_id && (l.product_id.barcode === barcode);
@@ -604,6 +613,7 @@ patch(BarcodePickingModel.prototype, {
                  });
 
                  if (targetLine) {
+                      console.log("[Bayani] Local line found, updating:", targetLine);
                       // Update Qty immediately
                       targetLine.qty_done = (targetLine.qty_done || 0) + 1;
                       targetLine.bayani_last_scan = scanEntry.timestamp;
@@ -616,7 +626,7 @@ patch(BarcodePickingModel.prototype, {
                       this.trigger('update'); 
                  } else {
                       // If line not found (maybe new line created by server?), reload
-                      console.log("[Bayani] Line not found locally, reloading...");
+                      console.log("[Bayani] Line not found locally, forcing reload...");
                       await this.trigger('reload');
                  }
              } else {
