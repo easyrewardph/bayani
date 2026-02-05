@@ -433,7 +433,7 @@ patch(BarcodePickingModel.prototype, {
                     }
                 }
                 
-                await this._processValidScan(cleaned);
+                await this._processValidScan(cleaned, { productId, lotId });
                 return;
             }
 
@@ -543,7 +543,7 @@ patch(BarcodePickingModel.prototype, {
         });
     },
 
-    async _processValidScan(barcode, record) {
+    async _processValidScan(barcode, { productId, lotId } = {}) {
           // Ensure session exists before processing
           if (!this.bayaniSession) {
               console.error("[Bayani] Session not initialized in _processValidScan");
@@ -563,18 +563,8 @@ patch(BarcodePickingModel.prototype, {
           await this._bayaniLog('scan', barcode, null, 'Strict Scan Request');
           await this._bayaniSaveSession();
 
-          const lines = this.lines || (this.env && this.env.model && this.env.model.lines) || (this.page && this.page.lines) || [];
-          const targetLine = lines.find((l) => {
-              const productMatch = l.product_id && (l.product_id.barcode === barcode || l.product_id.barcode === scanEntry.barcode);
-              const lotMatch = l.lot_id && l.lot_id.name === barcode;
-              const locationMatch = !this.currentLocationId || (l.location_id && (l.location_id.id === this.currentLocationId || l.location_id[0] === this.currentLocationId));
-              return (productMatch || lotMatch) && locationMatch;
-          });
-          if (targetLine) {
-              targetLine.qty_done = (targetLine.qty_done || 0) + 1;
-              targetLine.bayani_last_scan = scanEntry.timestamp;
-              this.trigger('update');
-          }
+          // Optimistic update removed - waiting for server confirmation as requested
+          this.trigger('update');
 
          try {
              // Strict Backend Call
@@ -583,20 +573,58 @@ patch(BarcodePickingModel.prototype, {
              
              if (res.status === 'success') {
                  const details = res.details || {};
-                 const successMsg = `✅ ${res.message}`;
+                 const productInfo = details.product || {};
+                 
+                 // Show Success Notification
+                 const successMsg = res.message || `✅ Product Scanned Successfully`;
                  if (this.env?.services?.notification) {
                      this.env.services.notification.add(successMsg, { type: 'success' });
                  }
                  
-                 // Update UI locally if needed, or reload
-                 this.trigger('update'); 
-                 
-                 const lastScan = this.bayaniSession.scans.find(s => s.scan_id === scanEntry.scan_id);
-                 if (lastScan) { lastScan.synced = true; lastScan.lastSyncStatus = 'success'; }
-                 await this._bayaniSaveSession();
+                 // Manual Local Update to avoid refresh
+                 const lines = this.lines || (this.env && this.env.model && this.env.model.lines) || (this.page && this.page.lines) || [];
+                 // Try to find the line using passed IDs first (more robust), enable fallback to barcode
+                 const targetLine = lines.find((l) => {
+                     // Check Location First
+                     const locationMatch = !this.currentLocationId || (l.location_id && (l.location_id.id === this.currentLocationId || l.location_id[0] === this.currentLocationId));
+                     if (!locationMatch) return false;
+                     
+                     // Check Product/Lot
+                     if (productId) {
+                         // precise match
+                         const pMatch = l.product_id && (l.product_id.id === productId || l.product_id[0] === productId);
+                         const lMatch = !lotId || (l.lot_id && (l.lot_id.id === lotId || l.lot_id[0] === lotId));
+                         return pMatch && lMatch;
+                     } else {
+                         // fallback to barcode text match
+                         const productMatch = l.product_id && (l.product_id.barcode === barcode);
+                         const lotMatch = l.lot_id && l.lot_id.name === barcode;
+                         return productMatch || lotMatch;
+                     }
+                 });
+
+                 if (targetLine) {
+                      // Update Qty immediately
+                      targetLine.qty_done = (targetLine.qty_done || 0) + 1;
+                      targetLine.bayani_last_scan = scanEntry.timestamp;
+                      
+                      // Also update session scan status
+                      const lastScan = this.bayaniSession.scans.find(s => s.scan_id === scanEntry.scan_id);
+                      if (lastScan) { lastScan.synced = true; lastScan.lastSyncStatus = 'success'; }
+                      await this._bayaniSaveSession();
+
+                      this.trigger('update'); 
+                 } else {
+                      // If line not found (maybe new line created by server?), reload
+                      console.log("[Bayani] Line not found locally, reloading...");
+                      await this.trigger('reload');
+                 }
              } else {
                  // Backend Rejected
                  this._bayaniShowError(res.error_code || "ERROR", res.message);
+                 // Remove the failed scan from session or mark failed? 
+                 // Keeping it in log but maybe we should revert the session add if we were strictly syncing?
+                 // For now, leaving it as history.
              }
          } catch (e) {
              console.warn("Server unreachable", e);
