@@ -623,7 +623,7 @@ patch(BarcodePickingModel.prototype, {
                       if (lastScan) { lastScan.synced = true; lastScan.lastSyncStatus = 'success'; }
                       await this._bayaniSaveSession();
 
-                      this.trigger('update'); 
+                       await this.trigger('reload');
                  } else {
                       // If line not found (maybe new line created by server?), reload
                       console.log("[Bayani] Line not found locally, forcing reload...");
