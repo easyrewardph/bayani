@@ -189,7 +189,7 @@ patch(BarcodePickingModel.prototype, {
         if (!this.bayaniSession || !this.bayaniSnapshot) return;
         const offlineScans = this.bayaniSession.scans.filter(s => !s.synced);
         let restoredCount = 0;
-        const lines = this.env.model ? (this.env.model.lines || this.lines) : null;
+        const lines = this.env?.model?.lines || this.lines || null;
         
         if (lines) {
              offlineScans.forEach(scan => {
@@ -203,10 +203,12 @@ patch(BarcodePickingModel.prototype, {
              if (restoredCount > 0) this.trigger('update'); 
         }
         if (offlineScans.length > 0) {
-            this.env.services.notification.add(
-                _t(`Restored ${offlineScans.length} unsynced scans`), 
-                { type: 'info' }
-            );
+            if (this.env?.services?.notification) {
+                this.env.services.notification.add(
+                    _t(`Restored ${offlineScans.length} unsynced scans`), 
+                    { type: 'info' }
+                );
+            }
             this._bayaniSync();
         }
     },
@@ -247,7 +249,9 @@ patch(BarcodePickingModel.prototype, {
             }
             await this._bayaniSaveSession();
             if (scansToSync.length > 0) {
-                 this.env.services.notification.add(_t("Background Sync Complete"), { type: 'success' });
+                 if (this.env?.services?.notification) {
+                     this.env.services.notification.add(_t("Background Sync Complete"), { type: 'success' });
+                 }
                  await this.trigger('reload');
             }
         } catch (e) {
@@ -559,7 +563,7 @@ patch(BarcodePickingModel.prototype, {
           await this._bayaniLog('scan', barcode, null, 'Strict Scan Request');
           await this._bayaniSaveSession();
 
-          const lines = this.lines || (this.env.model && this.env.model.lines) || (this.page && this.page.lines) || [];
+          const lines = this.lines || (this.env?.model?.lines) || (this.page?.lines) || [];
           const targetLine = lines.find((l) => {
               const productMatch = l.product_id && (l.product_id.barcode === barcode || l.product_id.barcode === scanEntry.barcode);
               const lotMatch = l.lot_id && l.lot_id.name === barcode;
@@ -580,7 +584,9 @@ patch(BarcodePickingModel.prototype, {
              if (res.status === 'success') {
                  const details = res.details || {};
                  const successMsg = `✅ ${res.message}`;
-                 this.env.services.notification.add(successMsg, { type: 'success' });
+                 if (this.env?.services?.notification) {
+                     this.env.services.notification.add(successMsg, { type: 'success' });
+                 }
                  
                  // Update UI locally if needed, or reload
                  this.trigger('update'); 
@@ -594,7 +600,9 @@ patch(BarcodePickingModel.prototype, {
              }
          } catch (e) {
              console.warn("Server unreachable", e);
-             this.env.services.notification.add("Offline: Scan Queued (Sync Pending)", { type: 'warning' });
+             if (this.env?.services?.notification) {
+                 this.env.services.notification.add("Offline: Scan Queued (Sync Pending)", { type: 'warning' });
+             }
          }
     },
 
