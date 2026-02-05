@@ -587,15 +587,12 @@ patch(BarcodePickingModel.prototype, {
                       lastScan.synced = true; 
                       lastScan.lastSyncStatus = 'success'; 
                   }
-                  await this._bayaniSaveSession();
-                  
-                  // Reload data from server to get updated quantities
-                  console.log("[Bayani] Reloading data from server...");
-                  await this.load();
-                  
-                  // Trigger UI update
-                  this.trigger('update');
-             } else {
+                   await this._bayaniSaveSession();
+                   
+                   // Reload the entire view to get updated quantities from server
+                   console.log("[Bayani] Reloading view with updated data...");
+                   await this.trigger('reload');
+               } else {
                  // Backend Rejected
                  this._bayaniShowError(res.error_code || "ERROR", res.message);
                  // Remove the failed scan from session or mark failed? 
