@@ -572,6 +572,7 @@ patch(BarcodePickingModel.prototype, {
                 [this.record.id, barcode, this.currentLocationId]);
              
               if (res.status === 'success') {
+                  if (this._bayaniDebug) console.log("[Bayani] Backend success, updating UI");
                   const details = res.details || {};
                   const productInfo = details.product || {};
                   
@@ -587,21 +588,58 @@ patch(BarcodePickingModel.prototype, {
                       lastScan.synced = true; 
                       lastScan.lastSyncStatus = 'success'; 
                   }
-                   await this._bayaniSaveSession();
-                   
-                   // Refresh snapshot from server so UI shows correct quantities
-                   try {
-                       const result = await this.orm.call('stock.picking', 'get_picking_snapshot', [this.record.id]);
-                       if (result.status === 'success' && result.data) {
-                           this.snapshot = result.data;
-                           this.bayaniSnapshot = result.data;
-                       }
-                   } catch (e) {
-                       if (this._bayaniDebug) console.warn("[Bayani] Snapshot refresh failed", e);
-                   }
-                   this.trigger('update');
-                   await this.trigger('reload');
-
+                  await this._bayaniSaveSession();
+                  
+                  // Update the line in the model so the view shows new qty_done immediately
+                  const lines = this.lines || (this.env?.model?.lines) || (this.page?.lines) || [];
+                  console.log("Lines: ", lines)
+                  const targetLine = lines.find((l) => {
+                      const lLocId = l.location_id ? (typeof l.location_id === 'object' ? (l.location_id.id ?? l.location_id[0]) : l.location_id) : null;
+                      console.log("lLocId: ", lLocId)
+                      if (this.currentLocationId && lLocId != this.currentLocationId) return false;
+                      const lProdId = l.product_id ? (typeof l.product_id === 'object' ? (l.product_id.id ?? l.product_id[0]) : l.product_id) : null;
+                      console.log("lProdId: ", lProdId)
+                      const lLotId = l.lot_id ? (typeof l.lot_id === 'object' ? (l.lot_id?.id ?? l.lot_id[0]) : l.lot_id) : null;
+                      console.log("lLotId: ", lLotId)
+                      const pMatch = lProdId != null && lProdId == productId;
+                      const lotMatch = !lotId || (lLotId != null && lLotId == lotId);
+                      console.log("lotMatch: ", lotMatch)
+                      console.log("pMatch: ", pMatch)
+                      return pMatch && lotMatch;
+                  });
+                  if (targetLine) {
+                      targetLine.qty_done = (targetLine.qty_done || 0) + 1;
+                      console.log("targetLine: ", targetLine)
+                      if (this._bayaniDebug) console.log("[Bayani] Local line updated, qty_done:", targetLine.qty_done);
+                  } else {
+                      if (this._bayaniDebug) console.warn("[Bayani] Line not found for local update", { productId, lotId, locId: this.currentLocationId });
+                      console.log("targetLine else: ", targetLine)
+                  }
+                  
+                  // Refresh snapshot from server for next scan validation
+                  try {
+                      const result = await this.orm.call('stock.picking', 'get_picking_snapshot', [this.record.id]);
+                      if (result.status === 'success' && result.data) {
+                          this.snapshot = result.data;
+                          this.bayaniSnapshot = result.data;
+                      }
+                  } catch (e) {
+                      if (this._bayaniDebug) console.warn("[Bayani] Snapshot refresh failed", e);
+                  }
+                  
+                  this.trigger('update');
+                  // Force the barcode view to re-render so quantity displays update
+                  if (this.env?.services?.action?.currentController?.jsId) {
+                      this.env.services.action.restore(this.env.services.action.currentController.jsId);
+                  }
+                  try {
+                      const reloadPromise = this.trigger('reload');
+                      if (reloadPromise && typeof reloadPromise.then === 'function') {
+                          await reloadPromise;
+                      }
+                  } catch (e) {
+                      if (this._bayaniDebug) console.warn("[Bayani] trigger reload failed", e);
+                  }
                } else {
                  // Backend Rejected
                   console.error("[Bayani] Backend Rejected:", res.message);
