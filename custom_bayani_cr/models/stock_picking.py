@@ -188,6 +188,9 @@ class StockPicking(models.Model):
             'lotsByName': {},
         }
         
+        products = picking.move_line_ids.mapped('product_id')
+        product_templates = products.mapped('product_tmpl_id')
+
         for line in picking.move_line_ids:
             reserved_qty = (
                 getattr(line, 'reserved_uom_qty', None)
@@ -243,11 +246,20 @@ class StockPicking(models.Model):
                 snapshot['locationsByBarcode'][line.location_id.name] = line.location_id.id
             if line.product_id.barcode:
                 snapshot['productsByBarcode'][line.product_id.barcode] = line.product_id.id
+            if line.product_id.product_tmpl_id.barcode:
+                snapshot['productsByBarcode'][line.product_id.product_tmpl_id.barcode] = line.product_id.id
             if line.lot_id and line.lot_id.name:
                 snapshot['lotsByName'][line.lot_id.name] = {
                     'id': line.lot_id.id,
                     'product_id': line.product_id.id,
                 }
+
+        packaging_recs = self.env['product.packaging'].sudo().search([
+            ('product_id', 'in', products.ids),
+            ('barcode', '!=', False),
+        ])
+        for packaging in packaging_recs:
+            snapshot['productsByBarcode'][packaging.barcode] = packaging.product_id.id
             
         return {'status': 'success', 'data': snapshot}
 

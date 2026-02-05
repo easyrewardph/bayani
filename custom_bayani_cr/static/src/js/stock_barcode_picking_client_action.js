@@ -359,6 +359,8 @@ patch(BarcodePickingModel.prototype, {
                 this.activeLocationId = locId;
                 this.currentLocationId = locId;
                 const locName = this._getLocationName(locId) || cleaned;
+                this.currentLocationName = locName;
+                if (this.trigger) this.trigger('update');
                 this._bayaniNotify(`Scan a product from ${locName}`, "info");
                 return;
             }
@@ -526,6 +528,19 @@ patch(BarcodePickingModel.prototype, {
           this.bayaniSession.scans.push(scanEntry);
           await this._bayaniLog('scan', barcode, null, 'Strict Scan Request');
           await this._bayaniSaveSession();
+
+          const lines = this.lines || (this.env.model && this.env.model.lines) || (this.page && this.page.lines) || [];
+          const targetLine = lines.find((l) => {
+              const productMatch = l.product_id && (l.product_id.barcode === barcode || l.product_id.barcode === scanEntry.barcode);
+              const lotMatch = l.lot_id && l.lot_id.name === barcode;
+              const locationMatch = !this.currentLocationId || (l.location_id && (l.location_id.id === this.currentLocationId || l.location_id[0] === this.currentLocationId));
+              return (productMatch || lotMatch) && locationMatch;
+          });
+          if (targetLine) {
+              targetLine.qty_done = (targetLine.qty_done || 0) + 1;
+              targetLine.bayani_last_scan = scanEntry.timestamp;
+              this.trigger('update');
+          }
 
          try {
              // Strict Backend Call
