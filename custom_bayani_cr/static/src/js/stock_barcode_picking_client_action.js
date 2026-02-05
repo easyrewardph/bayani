@@ -1,6 +1,6 @@
 /** @odoo-module **/
 console.log("=================================================");
-console.log("   BAYANI CUSTOM BARCODE MODULE LOADING (V9)     ");
+console.log("   BAYANI CUSTOM BARCODE MODULE LOADING (V10)     ");
 console.log("=================================================");
 console.log("File: custom_bayani_cr/static/src/js/stock_barcode_picking_client_action.js");
 

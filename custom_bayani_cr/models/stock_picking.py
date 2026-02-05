@@ -289,3 +289,20 @@ class StockPicking(models.Model):
                 })
         
         return {'status': 'success', 'results': results}
+
+    @api.model
+    def action_sync_logs(self, picking_id, logs):
+        """
+        Sync offline logs to the server.
+        """
+        picking = self.browse(picking_id)
+        if not picking.exists():
+            return False
+            
+        for log in logs:
+            self.action_log_scan_event(
+                log.get('barcode'),
+                'OFFLINE_SYNC',
+                f"Reason: {log.get('reason_code')} | Details: {log.get('details')}"
+            )
+        return True
