@@ -415,6 +415,20 @@ patch(BarcodePickingModel.prototype, {
                 if (this._bayaniDebug) {
                     console.log("[Bayani] Product accepted, processing scan");
                 }
+                
+                // Ensure session is initialized before processing
+                if (!this.bayaniSession) {
+                    if (this._bayaniDebug) {
+                        console.log("[Bayani] Session not ready, initializing...");
+                    }
+                    if (this.record?.id) {
+                        this.bayaniSession = this._createNewSession(this.record.id);
+                    } else {
+                        this._bayaniNotify("❌ Session initialization failed.", "danger");
+                        return;
+                    }
+                }
+                
                 await this._processValidScan(cleaned);
                 return;
             }
@@ -470,6 +484,15 @@ patch(BarcodePickingModel.prototype, {
                 hasSnapshot: !!this.snapshot,
             });
         }
+        
+        // Ensure session exists when snapshot is ready
+        if (this.snapshot && !this.bayaniSession && this.record?.id) {
+            if (this._bayaniDebug) {
+                console.log("[Bayani] Creating session after snapshot initialization");
+            }
+            this.bayaniSession = this._createNewSession(this.record.id);
+        }
+        
         return !!this.snapshot;
     },
 
@@ -517,6 +540,13 @@ patch(BarcodePickingModel.prototype, {
     },
 
     async _processValidScan(barcode, record) {
+          // Ensure session exists before processing
+          if (!this.bayaniSession) {
+              console.error("[Bayani] Session not initialized in _processValidScan");
+              this._bayaniNotify("❌ Session not ready. Please reload.", "danger");
+              return;
+          }
+          
           const scanEntry = {
              scan_id: Date.now().toString() + Math.random().toString(36).substring(7),
              barcode,
