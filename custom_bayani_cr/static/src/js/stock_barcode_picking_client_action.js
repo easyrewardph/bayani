@@ -1,6 +1,6 @@
 /** @odoo-module **/
 console.log("=================================================");
-console.log("   BAYANI CUSTOM BARCODE MODULE LOADING (V10)     ");
+console.log("   BAYANI CUSTOM BARCODE MODULE LOADING (V11)     ");
 console.log("=================================================");
 console.log("File: custom_bayani_cr/static/src/js/stock_barcode_picking_client_action.js");
 
@@ -594,6 +594,7 @@ patch(BarcodePickingModel.prototype, {
                    await this.trigger('reload');
                } else {
                  // Backend Rejected
+                  console.error("[Bayani] Backend Rejected:", res.message);
                  this._bayaniShowError(res.error_code || "ERROR", res.message);
                  // Remove the failed scan from session or mark failed? 
                  // Keeping it in log but maybe we should revert the session add if we were strictly syncing?

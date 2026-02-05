@@ -48,7 +48,7 @@ class StockPicking(models.Model):
         """
         picking = self.browse(picking_id)
         if not picking.exists():
-            raise UserError(_("Picking not found."))
+            return {"status": "error", "message": _("Picking not found.")}
 
         # ===== STEP 1: Barcode Lookup =====
         product = self.env['product.product'].search([('barcode', '=', barcode)], limit=1)
@@ -62,7 +62,7 @@ class StockPicking(models.Model):
             
         if not product:
             self.action_log_scan_event(barcode, 'FAILURE', "Barcode not found")
-            raise UserError(_("Barcode '%s' not found in system.") % barcode)
+            return {"status": "error", "message": _("Barcode '%s' not found in system.") % barcode}
 
         # ===== STEP 2: Strict Context Checks =====
         
@@ -102,7 +102,7 @@ class StockPicking(models.Model):
             # _logger.info("valid_location_ids: %s", valid_location_ids)
             if int(location_dest_id) not in valid_location_ids:
                  self.action_log_scan_event(barcode, 'FAILURE', "Location Mismatch")
-                 raise UserError(_("Invalid Location. Standard Picking requires scanning items from one of the Source Locations: %s") % (", ".join(picking.move_line_ids.mapped('location_id.display_name'))))
+                 return {"status": "error", "message": _("Invalid Location. Standard Picking requires scanning items from one of the Source Locations.")}
             # _logger.info("[Bayani] Location check passed. Proceeding to product validation.")
         else:
             # _logger.info("[Bayani] No location_dest_id provided; skipping location check.")
@@ -114,7 +114,7 @@ class StockPicking(models.Model):
         # _logger.info("[Bayani] Matching move lines count: %s", len(valid_move_lines))
         if not valid_move_lines:
             self.action_log_scan_event(barcode, 'FAILURE', "Product not in picking")
-            raise UserError(_("Product '%s' is not part of this picking.") % product.display_name)
+            return {"status": "error", "message": _("Product '%s' is not part of this picking.") % product.display_name}
 
         # 3. Lot Check
         if scanned_lot:
@@ -125,7 +125,7 @@ class StockPicking(models.Model):
                  # Check if the picking allows this lot (maybe unreserved but valid?)
                  # The requirement says: "ONLY lots already reserved on move lines are allowed"
                  self.action_log_scan_event(barcode, 'FAILURE', "Lot unauthorized")
-                 raise UserError(_("Lot '%s' is not reserved for this picking.") % scanned_lot.name)
+                 return {"status": "error", "message": _("Lot '%s' is not reserved for this picking.") % scanned_lot.name}
             valid_move_lines = lot_lines
             # _logger.info("[Bayani] Lot scan: %s (id=%s)", scanned_lot.name, scanned_lot.id)
         
@@ -135,7 +135,7 @@ class StockPicking(models.Model):
              # Requirement: "Odoo Stock Barcode (Picking & Packing) ... strict barcode scanning"
              # If tracked, we usually require lot scan. 
              # Let's enforce it if the logic implies we need a lot.
-             raise UserError(_("Product '%s' is tracked. Please scan a Lot/Serial Number.") % product.display_name)
+             return {"status": "error", "message": _("Product '%s' is tracked. Please scan a Lot/Serial Number.") % product.display_name}
 
         # ===== STEP 3: Quantity Validation & Update =====
         # Find a line that needs this item
@@ -150,7 +150,7 @@ class StockPicking(models.Model):
         
         if not assignable_line:
              self.action_log_scan_event(barcode, 'FAILURE', "Qty Exceeded")
-             raise UserError(_("All reserved quantity for '%s' has already been scanned.") % product.display_name)
+             return {"status": "error", "message": _("All reserved quantity for '%s' has already been scanned.") % product.display_name}
         
         # Apply Mutation
         line = assignable_line[0]
