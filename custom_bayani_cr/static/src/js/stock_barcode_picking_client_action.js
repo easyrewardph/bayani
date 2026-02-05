@@ -526,6 +526,66 @@ patch(BarcodePickingModel.prototype, {
         return !!this.snapshot?.productsByBarcode?.[barcode];
     },
 
+    /**
+     * Try to retrieve the barcode view's in-memory move lines from the model.
+     * Different Odoo/stock_barcode versions store them in different places.
+     */
+    _bayaniGetBarcodeLines() {
+        const looksLikeLine = (obj) => {
+            if (!obj || typeof obj !== "object") return false;
+            // Typical stock_barcode line keys
+            return (
+                ("qty_done" in obj || "qtyDone" in obj) &&
+                ("product_id" in obj || "productId" in obj || "product" in obj)
+            );
+        };
+
+        const firstLine = (arr) => (Array.isArray(arr) && arr.length ? arr[0] : null);
+
+        const candidates = [
+            ["this.lines", this.lines],
+            ["this.page?.lines", this.page?.lines],
+            ["this.pages?.[this.pageIndex]?.lines", this.pages?.[this.pageIndex]?.lines],
+            ["this.pages?.[this.currentPageIndex]?.lines", this.pages?.[this.currentPageIndex]?.lines],
+            ["this.pages?.[0]?.lines", this.pages?.[0]?.lines],
+            ["this.env?.model?.lines", this.env?.model?.lines],
+            ["this.env?.model?.page?.lines", this.env?.model?.page?.lines],
+            ["this.env?.model?.pages?.[this.env?.model?.pageIndex]?.lines", this.env?.model?.pages?.[this.env?.model?.pageIndex]?.lines],
+        ];
+
+        for (const [source, value] of candidates) {
+            if (Array.isArray(value) && looksLikeLine(firstLine(value))) {
+                return { lines: value, source };
+            }
+        }
+
+        // Heuristic fallback: scan a few known roots for an array of "line-like" objects
+        const roots = [
+            ["this", this],
+            ["this.env?.model", this.env?.model],
+            ["this.page", this.page],
+            ["this.pages", this.pages],
+        ];
+        for (const [rootName, root] of roots) {
+            if (!root || typeof root !== "object") continue;
+            for (const [key, value] of Object.entries(root)) {
+                if (Array.isArray(value) && looksLikeLine(firstLine(value))) {
+                    return { lines: value, source: `${rootName}.${key}` };
+                }
+                // One-level deep object: often `page = { lines: [...] }`
+                if (value && typeof value === "object" && !Array.isArray(value)) {
+                    for (const [k2, v2] of Object.entries(value)) {
+                        if (Array.isArray(v2) && looksLikeLine(firstLine(v2))) {
+                            return { lines: v2, source: `${rootName}.${key}.${k2}` };
+                        }
+                    }
+                }
+            }
+        }
+
+        return { lines: [], source: "none" };
+    },
+
     async _showBayaniStopDialog(message) {
         if (!this.env?.services?.dialog) {
             console.warn("[Bayani] STOP:", message);
@@ -591,29 +651,59 @@ patch(BarcodePickingModel.prototype, {
                   await this._bayaniSaveSession();
                   
                   // Update the line in the model so the view shows new qty_done immediately
-                  const lines = this.lines || (this.env?.model?.lines) || (this.page?.lines) || [];
-                  console.log("Lines: ", lines)
-                  const targetLine = lines.find((l) => {
-                      const lLocId = l.location_id ? (typeof l.location_id === 'object' ? (l.location_id.id ?? l.location_id[0]) : l.location_id) : null;
+                  const { lines, source: linesSource } = this._bayaniGetBarcodeLines();
+                  console.log("lines: ", lines)
+                  console.log("linesSource: ", linesSource)
+                  if (this._bayaniDebug) console.log("[Bayani] Lines source:", linesSource, "count=", lines.length);
+
+                  const extractId = (val) => {
+                      if (val == null) return null;
+                      if (typeof val === "number" || typeof val === "string") return val;
+                      if (Array.isArray(val)) return val[0];
+                      if (typeof val === "object") return val.id ?? val[0] ?? null;
+                      return null;
+                  };
+                  console.log("extractId: ", extractId)
+                  const matchLine = (l, { matchLocation }) => {
+                      const lLocId = extractId(l.location_id ?? l.locationId ?? l.source_location_id);
                       console.log("lLocId: ", lLocId)
-                      if (this.currentLocationId && lLocId != this.currentLocationId) return false;
-                      const lProdId = l.product_id ? (typeof l.product_id === 'object' ? (l.product_id.id ?? l.product_id[0]) : l.product_id) : null;
-                      console.log("lProdId: ", lProdId)
-                      const lLotId = l.lot_id ? (typeof l.lot_id === 'object' ? (l.lot_id?.id ?? l.lot_id[0]) : l.lot_id) : null;
-                      console.log("lLotId: ", lLotId)
+                      if (matchLocation && this.currentLocationId && lLocId != this.currentLocationId) return false;
+                      console.log("matchLocation: ", matchLocation)
+                      console.log("this.currentLocationId: ", this.currentLocationId)
+                      console.log("lLocId != this.currentLocationId: ", lLocId != this.currentLocationId)
+                      const lProdId = extractId(l.product_id ?? l.productId ?? l.product);
+                      const lLotId = extractId(l.lot_id ?? l.lotId);
+                      const lLotName = l.lot_name ?? l.lotName ?? (typeof l.lot_id === "object" ? l.lot_id?.name : null);
+                      console.log("lLotName: ", lLotName)
                       const pMatch = lProdId != null && lProdId == productId;
-                      const lotMatch = !lotId || (lLotId != null && lLotId == lotId);
-                      console.log("lotMatch: ", lotMatch)
                       console.log("pMatch: ", pMatch)
-                      return pMatch && lotMatch;
-                  });
+                      if (!pMatch) return false;
+                      console.log("lotId: ", lotId)
+                      if (!lotId) return true;
+                      return (lLotId != null && lLotId == lotId) || (lLotName && lLotName == barcode);
+                  };
+
+                  // Try strict match (location+product+lot) then relax to product+lot, then product only.
+                  let targetLine =
+                      lines.find((l) => matchLine(l, { matchLocation: true })) ||
+                      lines.find((l) => matchLine(l, { matchLocation: false })) ||
+                      lines.find((l) => {
+                          const lProdId = extractId(l.product_id ?? l.productId ?? l.product);
+                          return lProdId != null && lProdId == productId;
+                      });
+
                   if (targetLine) {
-                      targetLine.qty_done = (targetLine.qty_done || 0) + 1;
-                      console.log("targetLine: ", targetLine)
+                      // Support both snake_case and camelCase depending on model
+                      if ("qty_done" in targetLine) {
+                          targetLine.qty_done = (targetLine.qty_done || 0) + 1;
+                      } else if ("qtyDone" in targetLine) {
+                          targetLine.qtyDone = (targetLine.qtyDone || 0) + 1;
+                      } else {
+                          targetLine.qty_done = (targetLine.qty_done || 0) + 1;
+                      }
                       if (this._bayaniDebug) console.log("[Bayani] Local line updated, qty_done:", targetLine.qty_done);
                   } else {
                       if (this._bayaniDebug) console.warn("[Bayani] Line not found for local update", { productId, lotId, locId: this.currentLocationId });
-                      console.log("targetLine else: ", targetLine)
                   }
                   
                   // Refresh snapshot from server for next scan validation
@@ -629,14 +719,14 @@ patch(BarcodePickingModel.prototype, {
                   
                   this.trigger('update');
                   // Force the barcode view to re-render so quantity displays update
-                  if (this.env?.services?.action?.currentController?.jsId) {
+                  if (this.action?.restore && this.action?.currentController?.jsId) {
+                      this.action.restore(this.action.currentController.jsId);
+                  } else if (this.env?.services?.action?.restore && this.env?.services?.action?.currentController?.jsId) {
+                      // fallback for environments where action service is on env
                       this.env.services.action.restore(this.env.services.action.currentController.jsId);
                   }
                   try {
-                      const reloadPromise = this.trigger('reload');
-                      if (reloadPromise && typeof reloadPromise.then === 'function') {
-                          await reloadPromise;
-                      }
+                      await Promise.resolve(this.trigger('reload'));
                   } catch (e) {
                       if (this._bayaniDebug) console.warn("[Bayani] trigger reload failed", e);
                   }
@@ -651,7 +741,12 @@ patch(BarcodePickingModel.prototype, {
                          this.snapshot = result.data;
                          this.bayaniSnapshot = result.data;
                          this.trigger('update');
-                         await this.trigger('reload');
+                         if (this.action?.restore && this.action?.currentController?.jsId) {
+                             this.action.restore(this.action.currentController.jsId);
+                         } else if (this.env?.services?.action?.restore && this.env?.services?.action?.currentController?.jsId) {
+                             this.env.services.action.restore(this.env.services.action.currentController.jsId);
+                         }
+                         await Promise.resolve(this.trigger('reload'));
                      }
                  } catch (e) {
                      if (this._bayaniDebug) console.warn("[Bayani] Snapshot refresh after reject failed", e);
